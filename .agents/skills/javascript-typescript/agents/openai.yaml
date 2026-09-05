@@ -1,0 +1,4 @@
+interface:
+  display_name: "JavaScript & TypeScript"
+  short_description: "Write, debug, and verify JS/TS code"
+  default_prompt: "Use $javascript-typescript to write and verify JavaScript and TypeScript code."

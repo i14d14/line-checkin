@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "line-checkin-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-30",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "line-checkin-db",
+      "database_id": "d331ccb9-3aa5-48bd-8803-5e074e38b1c2"
+    }
+  ],
+  "vars": {
+    "LINE_LOGIN_CHANNEL_ID": "2011328810",
+    "LIFF_ID": "2011328810-vjUUBSYA",
+    "TARGET_LAT": "24.157722",
+    "TARGET_LON": "120.683167",
+    "ALLOWED_RADIUS_METERS": "100",
+    "LOCATION_NAME": "豬毛有限公司 - 台中美德總部",
+    "LINE_CHANNEL_ACCESS_TOKEN": "REDACTED_LINE_CHANNEL_ACCESS_TOKEN_VALUE_FOR_SECURITY_DUMMY_PLACEHOLDER_ONLY_REDACTED_REDACTED_REDACTED_REDACTED_REDACTED_REDACTED_REDACTED_REDACTED_REDACTED_REDACTED_REDACTED_",
+    "LINE_CHANNEL_SECRET": "REDACTED_LINE_CHANNEL_SECRET_000",
+    "LINE_BOT_BASIC_ID": "@375nvoga"
+  }
+}
