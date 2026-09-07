@@ -150,7 +150,7 @@ The project includes `run-wrangler.js` which automatically loads root `.env` bef
 | **Live Logs (Tail)** | `node run-wrangler.js tail` |
 | **Put Secret** | `node run-wrangler.js secret put <KEY_NAME>` |
 | **Generate Env Types** | `node run-wrangler.js types` |
-| **Revoke / Cancel Punches** | `node scripts/revoke-checkin.js <名稱/LINE_ID> [--date YYYY-MM-DD]` |
+| **Revoke / Cancel Punches** | `node scripts/revoke-checkin.js <NAME_OR_LINE_ID> [--date YYYY-MM-DD]` |
 
 ---
 

@@ -24,7 +24,7 @@ Do not use this skill when:
 
 ## Known Workspace Identities
 
-- **Admin / Primary Test User ID**: `Ubd107bb3ba1b85a8086fc3b2250458e8` (🐖毛)
+- **Admin / Primary Test User ID**: `Ubd107bb3ba1b85a8086fc3b2250458e8` (Pigmao)
 
 ## Required Inputs & Environment Variables
 
@@ -73,17 +73,17 @@ LINE_LOGIN_CHANNEL_SECRET=your_login_channel_secret
 1. **Dimensions & Grid Sizes** (standard 2500px width canvas, max 1MB, JPG/PNG):
    - **Full Size**: `2500 x 1686` px. 6-grid: `~833 x 843` px; 4-grid: `1250 x 843` px.
    - **Compact / Half Size**: `2500 x 843` px. 3-grid: `~833 x 843` px; 2-grid: `1250 x 843` px.
-2. **Typography & Minimalist Layout Practices (極簡純淨高對比規範)**:
-   - **Main CTA Text (2500px canvas)**: `80px – 120px` (粗體無襯線黑體/微軟正黑粗體，垂直與水平絕對置中 `anchor="mm"`).
-   - **Zero Subtitles & Zero Mini Badges (無副標、無迷你標籤)**: **全面去除所有副標題、說明字樣與上方迷你藥丸標籤（Pill Badge）**。
-   - **Theme Color Mapping (色彩直接套用於 CTA 與背景)**: 將各板塊之主題色彩直接套用於按鈕背景（淺色粉彩底或品牌純色底）與主文字 CTA 上，確保最高對比度與俐落感。
-   - **Button Copy Length**: 嚴格維持 **2 至 4 個中文字**（例如「考勤打卡」、「排班月曆」、「線上簽核」、「今日出勤」），嚴禁 >6 字。
+2. **Typography & Minimalist Layout Practices (High-Contrast Clean Layout Standards)**:
+   - **Main CTA Text (2500px canvas)**: `80px – 120px` (bold sans-serif font, absolute vertical and horizontal center `anchor="mm"`).
+   - **Zero Subtitles & Zero Mini Badges**: Completely eliminate all subtitles, descriptive captions, and top pill badges.
+   - **Theme Color Mapping**: Apply each section's theme color directly to button backgrounds (pastel tint or solid brand base) and the main CTA typography to guarantee maximum contrast and clean aesthetics.
+   - **Button Copy Length**: Strictly enforce **2 to 4 Chinese characters** (e.g. 「考勤打卡」, 「排班月曆」, 「線上簽核」, 「今日出勤」); never exceed 6 characters.
    - **Technical Action Label**: Max 20 characters (accessibility / fallback).
 3. Create rich menu configuration object defining touch areas and actions (e.g. URI action pointing to `https://liff.line.me/{LIFF_ID}`).
 4. Upload image via multipart/image endpoint and set as default or link per user.
 - Read `references/rich-menu-api.md` for Rich Menu JSON payload, button coordinate templates, and API calls.
 
-- **Rich Menu 嚴禁使用 Emoji**：Rich Menu 的圖稿設計、文字渲染、`chatBarText` 及 action label 請勿使用 Emoji 表情符號。在多數繪圖工具或 LINE 客戶端渲染時，Emoji 會破圖變成 Unicode 缺字方塊（豆腐塊 `□`）。建議全面使用純文字或向量 Icon 圖示。
+- **No Emojis in Rich Menus**: Never use Emoji symbols in Rich Menu artwork, text rendering, `chatBarText`, or action labels. In many rendering engines and LINE clients, emojis break into missing-glyph tofu boxes (`□`). Always use plain text or vector icons.
 - **LIFF Channel Type**: LIFF apps can only be created under **LINE Login** or **LINE MINI App** channels (since LIFF v2). They cannot be created under Messaging API channels.
 - **Raw Webhook Body**: Always verify signature on the exact raw string or binary buffer. Modifying whitespace, re-serializing JSON, or reading parsed form bodies will cause signature validation failure (`InvalidSignatureError`).
 - **Reply Token Expiry**: `reply_token` expires within ~30-60 seconds and is single-use. If long processing is needed, immediately reply or switch to Push API.

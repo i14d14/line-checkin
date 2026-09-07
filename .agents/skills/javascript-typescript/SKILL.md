@@ -43,6 +43,26 @@ Write clean, robust, and type-safe JavaScript (ES6+) and TypeScript.
 - **Symptom / Gotcha**: Integration test assertions relying on exact table row counts (e.g. `locData.count === 2`) fail when executed after another test suite that inserted new permanent records into shared remote databases.
 - **Rule**: Ensure integration tests are self-contained and idempotent. Use scoped queries (e.g. `companyTaxId`), upsert test prerequisites at suite initialization, and avoid hardcoding total table row counts.
 
+### 5. Single-Quote Escaping inside Backend Template Literals (`Unexpected string`)
+- **Symptom / Gotcha**: Writing inline event handlers like `'<button onclick="fn(\\'' + id + '\\')">'` inside a TypeScript backtick template literal (`` `...` ``) causes `\'` to evaluate to a bare `'` at compile time. In the generated HTML, the browser receives `'<button onclick="fn('' + id + '')">'`, which immediately throws `SyntaxError: Unexpected string` on page load, terminating the entire `<script>` execution.
+- **Rule**: Avoid inline single-quote string concatenation in HTML string templates. Instead, use HTML5 data attributes:
+  ```javascript
+  // ✅ Correct & immune to template escaping issues
+  '<button data-id="' + id + '" onclick="fn(this.dataset.id)">'
+  ```
+
+### 6. Temporal Dead Zone (TDZ) via Early-Executing Hoisted Calls
+- **Symptom / Gotcha**: Function declarations are hoisted to the top of the scope, but `let` and `const` variables are not initialized until execution reaches their lexical declaration (Temporal Dead Zone - TDZ). If top-level script execution (e.g. early view switching based on URL parameters `?tab=approvals`) calls a hoisted function that references a `let` variable declared lower in the file, JavaScript throws `ReferenceError: Cannot access 'X' before initialization`. This uncaught top-level error aborts execution of the entire `<script>` tag, breaking all subsequent initialization (e.g. `initLiff()`).
+- **Rule**: Declare all top-level state variables (`let`, `const`) at the very top of client-side scripts, strictly before any top-level executable logic or function invocations.
+
+### 7. Form Submission UI State Locking (`try...finally` Button Protection)
+- **Symptom / Gotcha**: Disabling a submit button (`btn.disabled = true; btn.innerText = "Submitting...";`) before or outside the `try` block leaves the button permanently frozen if an unexpected error occurs during pre-request validation, DOM query, or payload construction. The user remains stuck with a disabled button and no way to retry.
+- **Rule**: Ensure any code path that disables a button or changes its state to "in progress" is unconditionally wrapped in a `try...finally` block where the `finally` clause guarantees the button is re-enabled and restored to its default label.
+
+### 8. Newline Escaping inside Backend Template Literals (`Invalid or unexpected token`)
+- **Symptom / Gotcha**: In server-rendered JavaScript string templates (e.g. `renderAdminScripts()` returning a backtick template literal `` `...` ``), writing `\n` inside a client-side string (e.g. `'Are you sure?\nThis cannot be undone.'`) is evaluated at compile-time as a literal line break in the emitted HTML. In the browser, raw unescaped line breaks inside single- or double-quoted JS strings cause an immediate `SyntaxError: Invalid or unexpected token` on script parse, crashing all client-side JavaScript execution (including login, event handlers, and page initialization).
+- **Rule**: In SSR/backend template literals, never use bare `\n` inside client-side quoted string literals. Use quadruple backslashes (`\\\\n`) so TypeScript emits `\n` as an escape sequence in the output JS, or use string concatenation without embedded newlines. Always validate generated client scripts with `new Function(code)` in integration tests.
+
 ---
 
 ## Workflow & Best Practices

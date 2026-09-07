@@ -22,11 +22,11 @@ A poorly segmented "God Table" (one giant table with 30-50 columns) introduces t
 ### Pillar B: Domain-Driven Segmentation (DDD Bounded Context)
 - **Goal**: Align physical database tables with distinct business capabilities.
 - **Classification of Tables**:
-  1. **Master Dimension Tables (實體主表)**: Slowly changing business entities (e.g. `locations`, `companies`).
-  2. **Attribution / Relationship Tables (關聯歸屬表)**: Mapping many-to-many or 1-to-many business relationships (e.g. `company_employees`).
-  3. **State / Hardware Binding Tables (狀態/綁定表)**: Current operational snapshot (e.g. `user_devices` storing current 1-to-1 active hardware token).
-  4. **Transactional Event Streams (交易流水表)**: Immutable or state-machine time-series logs (e.g. `checkin_records`).
-  5. **Security & Audit Logs (安全稽核表)**: Append-only compliance changelogs (e.g. `device_audit_logs`).
+  1. **Master Dimension Tables**: Slowly changing business entities (e.g. `locations`, `companies`).
+  2. **Attribution / Relationship Tables**: Mapping many-to-many or 1-to-many business relationships (e.g. `company_employees`).
+  3. **State / Hardware Binding Tables**: Current operational snapshot (e.g. `user_devices` storing current 1-to-1 active hardware token).
+  4. **Transactional Event Streams**: Immutable or state-machine time-series logs (e.g. `checkin_records`).
+  5. **Security & Audit Logs**: Append-only compliance changelogs (e.g. `device_audit_logs`).
 
 ### Pillar C: Vertical Partitioning (Physical I/O Optimization)
 - **Goal**: Maximize memory cache efficiency by separating "Hot" columns from "Cold" / heavy payload columns.

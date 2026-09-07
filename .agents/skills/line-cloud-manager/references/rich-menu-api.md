@@ -12,12 +12,12 @@
   - **Compact 3-Grid (1x3)**: Width `~833` px, Height `843` px.
   - **Compact 2-Grid (1x2)**: Width `1250` px, Height `843` px.
 - **Typography & Minimalist Layout Best Practices (at 2500px canvas)**:
-  - **Primary CTA Text**: `80px – 120px` (粗體無襯線黑體/微軟正黑粗體，垂直與水平置中 `anchor="mm"`).
-  - **Zero Subtitles & Zero Mini Badges (無副標、無迷你標籤)**: 捨棄所有副標與上方小標籤，版面留白最大化。
-  - **Theme Color & High Contrast**: 將分類主題色彩直接套用於背景（淺色粉彩底或品牌底色）與主 CTA 文字，兼顧美感與無障礙閱讀。
-  - **Font Weight & Family**: Bold sans-serif (e.g. Noto Sans CJK TC, 微軟正黑體粗體).
+  - **Primary CTA Text**: `80px – 120px` (bold sans-serif font, absolute vertical and horizontal center `anchor="mm"`).
+  - **Zero Subtitles & Zero Mini Badges**: Completely eliminate all subtitles, descriptive captions, and top pill badges to maximize clean negative space.
+  - **Theme Color & High Contrast**: Apply category theme colors directly to button backgrounds (pastel tints or brand solid bases) and primary CTA typography for clean aesthetics and accessibility.
+  - **Font Weight & Family**: Bold sans-serif (e.g. Noto Sans CJK TC, Microsoft JhengHei Bold).
 - **Character Count & Copywriting**:
-  - **Button Visual Text**: **2 to 4 Chinese characters** (e.g.「考勤打卡」、「排班月曆」、「今日出勤」). Max 6 characters.
+  - **Button Visual Text**: **2 to 4 Chinese characters** (e.g.「考勤打卡」, 「排班月曆」, 「今日出勤」). Max 6 characters.
   - **Action Technical `label`**: Max 20 characters (accessibility / fallback).
 
 ---
