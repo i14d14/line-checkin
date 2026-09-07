@@ -2,7 +2,7 @@
 
 > **建立時間**：2026-08-30  
 > **最後更新**：2026-09-07  
-> **當前版本**：`v2.20.0`（SSOT 實體排班架構、未排班透明感知與固定班一鍵實體化 / 徹底根治定時推播失聯 / D1 company_employees 擴充 schedule_mode 與預設工時欄位 / Schema v13）  
+> **當前版本**：`v2.20.1`（雙軌驗證打卡使用者實機驗收通過 / 門市 Wi-Fi 直通與外網 GPS 圍欄落地 / 跨版本永久繼承 / Schema v13）  
 > **專案定位**：基於 Cloudflare Workers、Cloudflare D1 與 LINE LIFF / Messaging API 的多公司（Multi-Tenant）Serverless GPS 地理圍欄考勤打卡系統。
 > **架構劃分**：我方雲端（24/7 驗證核心）+ 客戶地端（敏感個資/計薪自持 + 自助管理後台）。
 
@@ -61,7 +61,7 @@
 
 | 模組分類 | 功能項目 | 驗證狀態 | 實機測試備註 / 驗收歷程 |
 | :--- | :--- | :---: | :--- |
-| **1. 打卡與防弊** | 雙軌驗證打卡 (GPS + IP/CIDR 白名單) | `[Pending User Verification ⏳]` | **v2.14.7 142m GPS 距離邊界驗證與遠端審計**：針對美德總部據點（`24549210-01`，法定名稱：`豬毛有限公司 - 台中美德總部`，座標：`24.157722, 120.683167`，半徑：`100m`，白名單：`59.126.167.108`）完成 5 大情境 39 項全數通過遠端審計：① 回報案例座標 `24.1565, 120.6835`（Haversine 140.02m ~ 142m）走外網電信 IP 精準被 HTTP 400 攔截（`GPS_FALLBACK`）；② 精準 142m 座標無 Wi-Fi 回傳 `distanceMeters: 142` 被 400 攔截；③ 142m 相同座標連上公司 Wi-Fi 正常打卡通過（`IP_WHITELIST`）；④ 範圍內 30m 外網 GPS 正常打卡通過；⑤ 邊界閥值 95m 通過 vs 105m 精準被 400 攔截；測試用戶軌跡全數自動自持清理 |
+| **1. 打卡與防弊** | 雙軌驗證打卡 (GPS + IP/CIDR 白名單) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：① 門市現場 Wi-Fi（固定 IP `59.126.167.108`）連線打卡秒過並精準記錄 `verify_mode: "IP_WHITELIST"`，享有室內 GPS 飄移豁免；② 外網電信連線自動觸發 `GPS_FALLBACK`，未在 100m 圍欄內精準以 HTTP 400 攔截阻斷；③ 遠端 142m 邊界 5 大情境 39 項自動化審計全數 PASS，跨版本永久繼承 |
 | | 智慧狀態機推論 (上下班/跨日大夜/超長間隔) | `[User Verified ✅]` | 實機驗證通過，自動歸位與工時計算無誤 |
 | | 30 秒聊天室安全防護網 (收據翻轉/撤回) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：① 撤回按鈕改為中性灰（`#718096`）；② 翻轉按鈕精簡為五字「翻轉上下班」；③ 重複打卡收據按鈕自動消失；④ 後端 Webhook 嚴格禁止對 `DUPLICATE` 紀錄執行翻轉/撤回，經生產環境 raw POST 滲透測試與 D1 狀態查核確認 100% 阻斷，徹底防堵 30 秒時限繞過漏洞 |
 | | 員工自主換機打卡 (防作弊確認彈窗 ＆ 警告日誌) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**，換機二階段防弊彈窗與 SWITCH_DEVICE 稽核無誤 |
@@ -1100,7 +1100,14 @@ d:\line-checkin/
     - **成效指標**：
       - 新增專屬驗證套件 [`test_roster_ssot_and_unscheduled.js`](file:///d:/line-checkin/test_roster_ssot_and_unscheduled.js) **33/33 斷言 100% PASS**。
       - 全量迴歸測試 131/131 PASS，累計 164 項自動化測試 100% 通過。
-      - `npm run check`（`client:check` + `tsc --noEmit` + `depcruise src`）維持 **0 型別錯誤、0 架構違規**（51 模組、122 依賴）。
+58. **雙軌驗證打卡 (GPS + IP/CIDR 白名單) 使用者實機驗收通過 (Persistent User Verification of Dual-Track Check-in v2.20.1)**：
+    - **驗收結果與持久化繼承**：
+      - 使用者於真實行動裝置與實體門市網路情境（台中美德總部 `24549210-01`，對外固定 IP `59.126.167.108`）完成實機打卡測試與驗收。
+      - 實測確認連線公司指定 Wi-Fi 時精準命中白名單直通（`verify_mode: "IP_WHITELIST"`），出勤打卡秒級成功且享有室內 GPS 飄移豁免。
+      - 狀態持久化繼承：Section 2.1 全功能使用者實機驗證狀態矩陣已永久更新為 `[User Verified ✅]`，跨版本永久繼承。
+    - **成效指標**：
+      - `npm run check`（`client:check` + `tsc --noEmit` + `depcruise src`）維持 **0 型別錯誤、0 架構違規**。
+      - 全量回歸測試維持 100% PASS。
 
 ---
 
