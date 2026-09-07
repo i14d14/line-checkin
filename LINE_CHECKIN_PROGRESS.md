@@ -2,7 +2,7 @@
 
 > **建立時間**：2026-08-30  
 > **最後更新**：2026-09-07  
-> **當前版本**：`v2.20.2`（門市現場一鍵登記 Wi-Fi 使用者實機驗收通過 / 跨版本永久繼承 / Schema v13）  
+> **當前版本**：`v2.20.3`（主管 LIFF 工作台 GPS 座標快速校準文案精簡潤飾 / Schema v13）  
 > **專案定位**：基於 Cloudflare Workers、Cloudflare D1 與 LINE LIFF / Messaging API 的多公司（Multi-Tenant）Serverless GPS 地理圍欄考勤打卡系統。
 > **架構劃分**：我方雲端（24/7 驗證核心）+ 客戶地端（敏感個資/計薪自持 + 自助管理後台）。
 

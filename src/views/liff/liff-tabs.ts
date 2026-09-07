@@ -390,19 +390,11 @@ export function renderLiffTabs(currentMonthStr: string): string {
           </h2>
           <span class="text-[10px] text-gray-400 font-mono">set_location</span>
         </div>
-        <p class="text-xs text-gray-500">您具備門市座標設定權限。若需重新校準門市打卡範圍：</p>
-        <div class="bg-blue-50/50 p-3 rounded-2xl border border-blue-100 text-xs text-gray-700 space-y-1.5">
-          <div class="flex items-start space-x-2">
-            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold">1</span>
-            <span>在門市現場打開 LINE 機器人聊天室。</span>
-          </div>
-          <div class="flex items-start space-x-2">
-            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold">2</span>
-            <span>點擊聊天室左下角「+」號，選擇「分享位置資訊」。</span>
-          </div>
-          <div class="flex items-start space-x-2">
-            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold">3</span>
-            <span>釘選當前門市位置發送，系統即自動覆寫門市打卡座標！</span>
+        <div class="bg-blue-50/50 p-3.5 rounded-2xl border border-blue-100 text-xs text-gray-700 flex items-start space-x-2.5">
+          <i class="fa-solid fa-circle-info text-blue-500 text-sm mt-0.5"></i>
+          <div>
+            <p class="font-bold text-gray-800 mb-0.5">現場快速校準座標</p>
+            <p class="text-gray-600 leading-relaxed">人在門市現場，直接在此 LINE 聊天室<strong>分享位置資訊</strong>即可自動完成門市座標更新。</p>
           </div>
         </div>
       </div>
