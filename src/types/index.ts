@@ -1,3 +1,5 @@
+/// <reference path="./client-assets.d.ts" />
+
 export interface Env {
   DB: D1Database;
   ATTACHMENTS_BUCKET?: R2Bucket;

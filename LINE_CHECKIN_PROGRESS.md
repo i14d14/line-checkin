@@ -2,7 +2,7 @@
 
 > **建立時間**：2026-08-30  
 > **最後更新**：2026-09-07  
-> **當前版本**：`v2.17.1`（修復後台 JavaScript 換行符號 SSR 轉義錯誤引發之解析中斷問題 / Schema v12）  
+> **當前版本**：`v2.18.1`（修復前端控制台非-01分店據點點擊管理 ReferenceError 異常 / Schema v12）  
 > **專案定位**：基於 Cloudflare Workers、Cloudflare D1 與 LINE LIFF / Messaging API 的多公司（Multi-Tenant）Serverless GPS 地理圍欄考勤打卡系統。
 > **架構劃分**：我方雲端（24/7 驗證核心）+ 客戶地端（敏感個資/計薪自持 + 自助管理後台）。
 
@@ -1050,7 +1050,30 @@ d:\line-checkin/
     - **成效指標**：
       - `npm run check`（`tsc --noEmit` + `depcruise src`）維持 **0 型別錯誤、0 架構違規**。
       - 自動化測試套件（`test_smart_punch.js` 7/7）全數 100% 通過。
-      - 邊緣部署成功（Version ID: `da4eda52-7ddc-40c6-9e7a-fab7d2e74adc`）。
+55. **前端腳本實體檔案隔離與零轉義載入架構 (Client Script Physical Separation & Zero-Escaping Raw Loader v2.18.0)**：
+    - **背景問題**：
+      - 過去將 1,400+ 行管理後台客戶端 JavaScript 包覆於後端 TypeScript 模板字串（`` `...` ``）中，在涉及跳行符號（如 `\n\n`）或特殊正規表達式時，後端編譯器會提早解碼轉義字符，造成瀏覽器端 JavaScript 出現非預期換行或語法崩潰（`SyntaxError: Invalid or unexpected token`）。
+    - **核心架構重構**：
+      - **實體檔案分離**：將前端 JavaScript 邏輯抽離至獨立實體檔案 [`src/views/admin/admin.client.js`](file:///d:/line-checkin/src/views/admin/admin.client.js)，重拾 IDE 原生語法高亮、格式化與靜態檢查能力。
+      - **Wrangler Text Loader 零轉義機制**：在 [`wrangler.jsonc`](file:///d:/line-checkin/wrangler.jsonc) 設定 `rules: [{ type: "Text", globs: ["**/*.client.js"] }]`，讓 esbuild 將其直接編譯為外部原始文字模組，完全不經過 TS 模板字串求值，達成 Zero-Escaping 原樣注入。
+      - **TypeScript 型別與依賴邊界防護**：於 [`src/types/client-assets.d.ts`](file:///d:/line-checkin/src/types/client-assets.d.ts) 提供環境宣告，[`src/views/admin/admin-scripts.ts`](file:///d:/line-checkin/src/views/admin/admin-scripts.ts) 作為轉接層單純封裝 `<script>` 標籤，完美符合 Dependency Cruiser 之 `views` 架構邊界規範。
+      - **原生 AST 語法檢查**：於 `package.json` 整合 `client:check` (`node --check src/views/admin/admin.client.js`)，將前端語法錯誤攔截提前至編譯期。
+    - **成效指標**：
+      - `npm run check`（`client:check` + `tsc --noEmit` + `depcruise src`）維持 **0 型別錯誤、0 架構違規**。
+      - 全自動化測試套件（BPM、公告、薪資條、據點刪除、後台鑑權等 170+ 測試項）100% 通過。
+
+56. **修復前端控制台非 -01 分店據點點擊管理 ReferenceError 異常 (Fix Uncaught ReferenceError on Non-01 Location Click v2.18.1)**：
+    - **痛點根因**：
+      - 前端腳本 [`src/views/admin/admin.client.js`](file:///d:/line-checkin/src/views/admin/admin.client.js) 之 `openEditLocationModal` 函式在判定「總部據點不可刪除按鈕」時，使用了未宣告變數 `currentUser`（`if (loc.id.endsWith('-01') || (currentUser && loc.id === currentUser.taxId))`）。
+      - 總店 `24549210-01` 因以 `-01` 結尾觸發 JavaScript 邏輯或 `||` 之短路求值（Short-circuit evaluation），略過右側求值因此可正常彈窗；而分店 `24549210-02` 等非 `-01` 據點因左側為 `false`，強制求值未定義之 `currentUser`，拋出致命 `ReferenceError: currentUser is not defined`，導致彈窗呼叫中斷。
+    - **修復方案**：
+      - 於模組頂層宣告 `let currentUser = null;`，並於登入成功（`handleLogin`）、登出（`handleLogout`）、頁面初始化（`initAppView`）、Session 檢核（`checkAuthAndInit`）與本機快取還原（`getCurrentUser()`）時建立防禦性同步存取閉環。
+      - 彈窗邏輯改用 `const user = getCurrentUser();` 安全取值，確保非 `-01` 分店據點點擊管理設定時不再報錯，且刪除按鈕依權限正確展開。
+    - **實機驗收**：
+      - 使用者於網頁管理後台實測點擊分店據點（`24549210-02`）確認彈窗開啟與管理功能運作正常（`[User Verified ✅]`）。
+    - **成效指標**：
+      - `npm run check`（`client:check` + `tsc --noEmit` + `depcruise src`）維持 **0 型別錯誤、0 架構違規**。
+      - 擴充 [`test_admin_auth_and_keys.js`](file:///d:/line-checkin/test_admin_auth_and_keys.js) 新增 `-01` 與 `-02` 據點彈窗渲染與刪除按鈕顯示狀態之完整 DOM 虛擬執行驗證（30/30 通過）。
 
 ---
 

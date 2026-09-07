@@ -49,6 +49,62 @@ async function runTest() {
   }
   assert("地端管理入口所有前端 JavaScript 語法檢驗 100% 通過無解析錯誤", scriptSyntaxValid);
 
+  // 1b. Test openEditLocationModal for both -01 and -02 (verify no ReferenceError: currentUser is not defined)
+  let delBtnHiddenFor01 = false;
+  let delBtnVisibleFor02 = false;
+  let modalOpenedFor02 = false;
+  try {
+    const vm = require("vm");
+    const fs = require("fs");
+    const path = require("path");
+    const dom = {
+      elements: {},
+      getElementById(id) {
+        if (!this.elements[id]) {
+          this.elements[id] = {
+            value: "",
+            innerText: "",
+            classList: {
+              classes: new Set(["hidden"]),
+              add(c) { this.classes.add(c); },
+              remove(c) { this.classes.delete(c); },
+              contains(c) { return this.classes.has(c); }
+            }
+          };
+        }
+        return this.elements[id];
+      }
+    };
+    const sandbox = {
+      window: { location: { origin: "https://line-checkin-worker.i14d142.workers.dev" }, addEventListener: () => {} },
+      document: dom,
+      sessionStorage: { getItem: () => JSON.stringify({ taxId: "24549210", username: "admin" }) },
+      localStorage: { getItem: () => null },
+      console
+    };
+    vm.createContext(sandbox);
+    const clientCode = fs.readFileSync(path.resolve(__dirname, "src/views/admin/admin.client.js"), "utf8");
+    vm.runInContext(clientCode, sandbox);
+
+    sandbox.renderLocations([
+      { id: "24549210-01", name: "台中美德總部", allowed_radius: 100 },
+      { id: "24549210-02", name: "台北101門市", allowed_radius: 100 }
+    ]);
+
+    // Call openEditLocationModal for 24549210-01
+    sandbox.openEditLocationModal("24549210-01");
+    delBtnHiddenFor01 = dom.getElementById("locDeleteBtn").classList.contains("hidden");
+
+    // Call openEditLocationModal for 24549210-02
+    sandbox.openEditLocationModal("24549210-02");
+    delBtnVisibleFor02 = !dom.getElementById("locDeleteBtn").classList.contains("hidden");
+    modalOpenedFor02 = !dom.getElementById("locModal").classList.contains("hidden");
+  } catch (err) {
+    console.error("  ❌ openEditLocationModal Runtime Error:", err);
+  }
+  assert("總店據點 (24549210-01) 彈窗開啟且刪除按鈕隱藏", delBtnHiddenFor01);
+  assert("分店據點 (24549210-02) 彈窗開啟無 ReferenceError 且刪除按鈕正常顯示", delBtnVisibleFor02 && modalOpenedFor02);
+
   // 2. Login Failure Scenarios
   console.log("\n--- 2. 帳號密碼登入防護與錯誤處理測試 ---");
   const emptyLoginResp = await fetch(`${BASE_URL}/api/v1/admin/login`, {
