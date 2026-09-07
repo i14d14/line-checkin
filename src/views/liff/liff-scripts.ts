@@ -1134,6 +1134,20 @@ export function renderLiffScripts(liffId: string): string {
     const handleLeaveProofSelected = handleApprProofSelected;
     const removeLeaveProof = removeApprProof;
 
+    function setApprSubmitBlocked(blocked) {
+      const btn = document.getElementById('apprSubmitBtn');
+      if (!btn) return;
+      if (blocked) {
+        btn.disabled = true;
+        btn.dataset.blocked = "true";
+        btn.className = "w-full py-3 bg-gray-300 text-gray-500 font-bold rounded-xl cursor-not-allowed transition flex items-center justify-center space-x-1.5";
+      } else {
+        btn.disabled = false;
+        btn.dataset.blocked = "false";
+        btn.className = "w-full py-3 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center space-x-1.5";
+      }
+    }
+
     function onApprDateChange() {
       const targetDateEl = document.getElementById('apprTargetDate');
       if (!targetDateEl) return;
@@ -1142,29 +1156,81 @@ export function renderLiffScripts(liffId: string): string {
       const noticeText = document.getElementById('leavePunchNoticeText');
       if (!targetDate || !noticeBox || !noticeText) return;
 
+      // Reset blocked state first
+      setApprSubmitBlocked(false);
+
       if (currentApprType === "LEAVE") {
-        let isRest = false;
-        let restText = "";
+        let day = null;
         if (monthlyDataCache && monthlyDataCache.days) {
-          const day = monthlyDataCache.days.find(d => d.date === targetDate);
-          if (day && day.isRestDay) {
-            isRest = true;
-            restText = day.shiftName || "排定休假日";
-          }
+          day = monthlyDataCache.days.find(d => d.date === targetDate);
         }
-        if (!isRest) {
-          const parts = targetDate.split("-").map(Number);
-          const dow = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])).getUTCDay();
-          if (dow === 0 || dow === 6) {
-            isRest = true;
-            restText = dow === 0 ? "週日例假" : "週六例假";
+
+        // Fallback weekend calculation if day is not in cached monthly data
+        let isWeekend = false;
+        let weekendText = "";
+        const parts = targetDate.split("-").map(Number);
+        const dow = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])).getUTCDay();
+        if (dow === 0 || dow === 6) {
+          isWeekend = true;
+          weekendText = dow === 0 ? "週日例假" : "週六例假";
+        }
+
+        // 1. Rest day check (isRestDay is true and not an approved leave shift)
+        if (day ? (day.isRestDay && !day.isLeave) : isWeekend) {
+          const restReason = (day && day.shiftName) || weekendText || "排定休假日";
+          noticeBox.className = "p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center space-x-1";
+          noticeText.innerHTML = '<strong>⚠️ 提示：</strong>' + targetDate + ' 為非工作日 / 休假日（' + restReason + '），無須請假。';
+          noticeBox.classList.remove('hidden');
+          setApprSubmitBlocked(true);
+          return;
+        }
+
+        // 2. Already full-day approved leave
+        if (day && day.status === "LEAVE") {
+          noticeBox.className = "p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center space-x-1";
+          noticeText.innerHTML = '<strong>⚠️ 提示：</strong>' + targetDate + ' 已核准全天請假（' + (day.shiftName || '請假') + '），無須重複請假。';
+          noticeBox.classList.remove('hidden');
+          setApprSubmitBlocked(true);
+          return;
+        }
+
+        // 3. Normal full attendance or already fully compensated by prior leave
+        if (day && day.status === "NORMAL") {
+          const hasOutPunch = Array.isArray(day.punches) && day.punches.some(p => p.punch_type === "OUT");
+          if (day.isToday && !hasOutPunch) {
+            // Today, currently working or pending completion: allow advance early leave notice
+            noticeBox.className = "p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-[11px] text-blue-800 flex items-center space-x-1";
+            noticeText.innerHTML = '<strong>💡 提示：</strong>今日出勤進行中，若需提前早退或請假，請選擇請假時段後送出。';
+            noticeBox.classList.remove('hidden');
+            setApprSubmitBlocked(false);
+            return;
+          } else {
+            const note = day.isLeave
+              ? '已由先前請假全額抵充（出勤 ' + day.workHours + 'h + 請假 ' + day.leaveHours + 'h）'
+              : '出勤紀錄正常且已打滿排班工時（出勤 ' + day.workHours + 'h）';
+            noticeBox.className = "p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center space-x-1";
+            noticeText.innerHTML = '<strong>⚠️ 提示：</strong>該日（' + targetDate + '）' + note + '，查無缺勤時段，無須請假。';
+            noticeBox.classList.remove('hidden');
+            setApprSubmitBlocked(true);
+            return;
           }
         }
 
-        if (isRest) {
-          noticeBox.className = "p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center space-x-1";
-          noticeText.innerHTML = '<strong>⚠️ 提示：</strong>' + targetDate + ' 為非工作日 / 休假日（' + restText + '），無須請假。';
+        // 4. Deficit detected (Absent, Late, Early Leave, Missing punch, etc.)
+        if (day && ["ABSENT", "LATE", "EARLY_LEAVE", "LATE_AND_EARLY", "MISSING_IN", "MISSING_OUT"].includes(day.status)) {
+          noticeBox.className = "p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 flex items-center space-x-1";
+          noticeText.innerHTML = '<strong>💡 缺勤時段偵測：</strong>' + day.statusText + '（已出勤 ' + day.workHours + ' 小時），請選擇假別與抵充時段。';
           noticeBox.classList.remove('hidden');
+          setApprSubmitBlocked(false);
+          return;
+        }
+
+        // 5. Future scheduled day or today before shift
+        if (day && (day.status === "SCHEDULED" || day.status === "TODAY")) {
+          noticeBox.className = "p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-[11px] text-blue-800 flex items-center space-x-1";
+          noticeText.innerHTML = '<strong>📅 事前請假：</strong>' + targetDate + ' 排定班表（' + (day.shiftName || '常態班') + '），可預先提交請假申請。';
+          noticeBox.classList.remove('hidden');
+          setApprSubmitBlocked(false);
           return;
         }
       }
@@ -1187,6 +1253,10 @@ export function renderLiffScripts(liffId: string): string {
       const btn = document.getElementById('apprSubmitBtn');
       const btnText = document.getElementById('apprSubmitBtnText');
       const alertBox = document.getElementById('apprAlert');
+
+      if (btn && (btn.dataset.blocked === "true" || btn.disabled)) {
+        return;
+      }
 
       if (btn) btn.disabled = true;
       if (btnText) btnText.innerText = "傳送申請中...";

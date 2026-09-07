@@ -1,4 +1,4 @@
-import { ApprovalRecord, ApprovalType, ApprovalStatus } from "../types";
+import { ApprovalRecord, ApprovalType, ApprovalStatus, DailySchedule } from "../types";
 
 export interface CreateApprovalParams {
   id: string;
@@ -228,18 +228,33 @@ export class ApprovalRepository {
     return result?.cnt || 0;
   }
 
-  async findEmployeeSchedule(lineUserId: string, workDate: string): Promise<{
-    shift_name: string;
-    is_rest_day: number;
-    shift_start: string | null;
-    shift_end: string | null;
-  } | null> {
+  async findEmployeeSchedule(lineUserId: string, workDate: string): Promise<DailySchedule | null> {
     return await this.db.prepare(`
-      SELECT shift_name, is_rest_day, shift_start, shift_end
+      SELECT work_date, shift_name, shift_start, shift_end, break_minutes, is_rest_day, is_cross_day
       FROM employee_schedules
       WHERE line_user_id = ? AND work_date = ?
       ORDER BY id DESC LIMIT 1
-    `).bind(lineUserId, workDate).first<any>();
+    `).bind(lineUserId, workDate).first<DailySchedule>();
+  }
+
+  async findPunchesByDate(lineUserId: string, targetDate: string): Promise<any[]> {
+    const { results } = await this.db.prepare(`
+      SELECT id, punch_type, created_at, work_hours, verify_mode, status
+      FROM checkin_records
+      WHERE line_user_id = ? AND created_at LIKE ? AND status IN ('SUCCESS', 'DUPLICATE')
+      ORDER BY id ASC
+    `).bind(lineUserId, `${targetDate}%`).all();
+    return results || [];
+  }
+
+  async findApprovedLeavesByDate(lineUserId: string, targetDate: string): Promise<any[]> {
+    const { results } = await this.db.prepare(`
+      SELECT id, type, target_date, details, status
+      FROM approvals
+      WHERE line_user_id = ? AND target_date = ? AND type = 'LEAVE' AND status = 'APPROVED'
+      ORDER BY id ASC
+    `).bind(lineUserId, targetDate).all();
+    return results || [];
   }
 
   async hasPendingLeaveRequest(lineUserId: string, targetDate: string): Promise<boolean> {

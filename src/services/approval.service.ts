@@ -1,6 +1,7 @@
 import { Env, ApprovalType, ApprovalStatus } from "../types";
 import { ApprovalRepository } from "../repositories/approval.repo";
 import { pushApprovalRequestFlex, pushApprovalResultFlex } from "../views/flex/approval-flex";
+import { auditDayAttendance } from "./schedule.service";
 
 export interface SubmitApprovalParams {
   userId: string;
@@ -60,7 +61,7 @@ export class ApprovalService {
       };
     }
 
-    // Validation: Leave requests are forbidden on non-working days / rest days
+    // Validation: Leave requests must satisfy Universal Deficit Invariant
     if (type === "LEAVE") {
       const hasPending = await this.repo.hasPendingLeaveRequest(userId, targetDate);
       if (hasPending) {
@@ -71,30 +72,53 @@ export class ApprovalService {
         };
       }
 
+      // Query schedule and punches for attendance deficit evaluation
       const schedule = await this.repo.findEmployeeSchedule(userId, targetDate);
-      let isRestDay = false;
-      let restReason = "";
+      const punches = await this.repo.findPunchesByDate(userId, targetDate);
 
-      if (schedule) {
-        if (schedule.is_rest_day === 1) {
-          isRestDay = true;
-          restReason = schedule.shift_name || "排定休假日";
-        }
-      } else {
-        const [y, m, d] = targetDate.split("-").map(Number);
-        const dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-          isRestDay = true;
-          restReason = dayOfWeek === 0 ? "週日例假" : "週六例假";
-        }
-      }
+      // Deterministic Taiwan (UTC+8) time anchor
+      const nowUtc = new Date();
+      const twDate = new Date(nowUtc.getTime() + 8 * 3600 * 1000);
+      const todayStr = twDate.toISOString().slice(0, 10);
+      const currentMinutes = twDate.getUTCHours() * 60 + twDate.getUTCMinutes();
 
-      if (isRestDay) {
+      const audit = auditDayAttendance(targetDate, schedule || undefined, punches, todayStr, currentMinutes);
+
+      // 1. Rest days / weekends (Standard or scheduled rest without regular shift requirement)
+      if (audit.isRestDay && !audit.isLeave) {
+        const restReason = audit.shiftName || "例假日";
         return {
           success: false,
           error: `無法發起請假申請：${targetDate} 為非工作日 / 休假日（${restReason}），無須請假。`,
           statusCode: 400
         };
+      }
+
+      // 2. Already full-day approved leave
+      if (audit.status === "LEAVE") {
+        return {
+          success: false,
+          error: `無法發起請假申請：該日（${targetDate}）已核准全天請假（${audit.shiftName}），無須重複請假。`,
+          statusCode: 400
+        };
+      }
+
+      // 3. Normal full attendance or already fully compensated by prior leave
+      if (audit.status === "NORMAL") {
+        const hasOutPunch = punches.some(p => p.punch_type === "OUT");
+        // Exception: Today, currently working or pending completion (no OUT punch)
+        if (targetDate === todayStr && !hasOutPunch) {
+          // Allow advance notice for leaving early / remainder of shift
+        } else {
+          const note = audit.isLeave
+            ? `已由先前請假全額抵充（出勤 ${audit.workHours}h + 請假 ${audit.leaveHours}h）`
+            : `出勤紀錄正常且已打滿排班工時（出勤 ${audit.workHours}h）`;
+          return {
+            success: false,
+            error: `無法發起請假申請：該日（${targetDate}）${note}，查無缺勤時段。`,
+            statusCode: 400
+          };
+        }
       }
     }
 

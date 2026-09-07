@@ -1,6 +1,6 @@
 {
   "name": "line-checkin-worker",
-  "version": "2.18.1",
+  "version": "2.19.0",
   "description": "LINE GPS Attendance & Check-in System on Cloudflare Workers & D1",
   "main": "src/index.ts",
   "scripts": {
