@@ -35,6 +35,20 @@ async function runTest() {
   assert("管理入口包含帳號密碼登入視窗", adminUiHtml.includes("LINE 考勤管理系統") && adminUiHtml.includes("inputUsername") && adminUiHtml.includes("inputPassword"));
   assert("管理入口包含 API 金鑰管理分頁", adminUiHtml.includes("API 金鑰管理") && adminUiHtml.includes("生成新金鑰"));
 
+  // Check that all client-side JavaScript in /admin parses cleanly without SyntaxError
+  const scripts = adminUiHtml.match(/<script[\s\S]*?<\/script>/gi) || [];
+  let scriptSyntaxValid = scripts.length > 0;
+  for (const s of scripts) {
+    const code = s.replace(/<\/?script[^>]*>/gi, '');
+    try {
+      new Function(code);
+    } catch (e) {
+      scriptSyntaxValid = false;
+      console.error("  ❌ Admin UI Script Syntax Error:", e);
+    }
+  }
+  assert("地端管理入口所有前端 JavaScript 語法檢驗 100% 通過無解析錯誤", scriptSyntaxValid);
+
   // 2. Login Failure Scenarios
   console.log("\n--- 2. 帳號密碼登入防護與錯誤處理測試 ---");
   const emptyLoginResp = await fetch(`${BASE_URL}/api/v1/admin/login`, {

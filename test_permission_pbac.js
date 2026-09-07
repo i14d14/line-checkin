@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 // Load environment variables
 const envPath = path.resolve(__dirname, '../.env');
@@ -58,13 +59,28 @@ async function getTestLocation() {
   return (data.locations || []).find(l => l.id === TEST_LOC_ID);
 }
 
+async function runD1Sql(sql) {
+  const tempFileName = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}.sql`;
+  const tempFilePath = path.resolve(__dirname, tempFileName);
+  fs.writeFileSync(tempFilePath, sql, 'utf8');
+  const res = spawnSync('node', ['run-wrangler.js', 'd1', 'execute', 'line-checkin-db', '--remote', `--file=./${tempFileName}`, '-y'], {
+    env: process.env,
+    shell: false,
+    cwd: __dirname,
+    encoding: 'utf8'
+  });
+  if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+  return res.status === 0;
+}
+
 async function main() {
   console.log("================================================================================");
   console.log("🚀 Running Automated PBAC (Permission-based Access Control) Test Suite (v2.1.0)");
   console.log("================================================================================\n");
 
-  // Step 0: Setup Prerequisites (Tenant API Key & Location via Edge API)
-  console.log("📋 [Setup] Provisioning Test Tenant Key & Location...");
+  try {
+    // Step 0: Setup Prerequisites (Tenant API Key & Location via Edge API)
+    console.log("📋 [Setup] Provisioning Test Tenant Key & Location...");
   const keyResp = await fetch(`${WORKER_URL}/api/v1/tenant/keys`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -344,6 +360,15 @@ async function main() {
     })
   });
   assert(resCmdPersonalSched.ok, "Webhook handles personal '班表' command");
+  } finally {
+    console.log("\n🧹 清理 PBAC 測試據點與測試實體 (Teardown)...");
+    await runD1Sql(`
+      DELETE FROM company_employees WHERE company_id = '${TEST_LOC_ID}' OR line_user_id IN ('${TEST_EMP_UNAUTH}', '${TEST_EMP_AUTH}', '${TEST_EMP_MANAGER}');
+      DELETE FROM tenant_api_keys WHERE tax_id = '${TEST_TAX_ID}' AND name LIKE '%PBAC%';
+      DELETE FROM locations WHERE id = '${TEST_LOC_ID}';
+    `);
+    console.log(`  ✅ PBAC 測試據點 ${TEST_LOC_ID} 與關聯測試資料清理完成。`);
+  }
 
   console.log("\n================================================================================");
   console.log(`🎉 ALL ${passedTests}/${totalTests} PBAC INTEGRATION TESTS PASSED 100%!`);

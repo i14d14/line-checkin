@@ -3,7 +3,43 @@
  * Verifies M2M Tenant Auth, RBAC, Multi-Tenant Scoping, Client Self-Service Locations, CSV Export, and QA Sandbox Isolation.
  */
 
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+
+const envPath = path.resolve(__dirname, '../.env');
+if (fs.existsSync(envPath)) {
+  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx !== -1) {
+      const key = trimmed.slice(0, idx).trim();
+      let val = trimmed.slice(idx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      process.env[key] = val;
+    }
+  }
+}
+
 const BASE_URL = "https://line-checkin-worker.i14d142.workers.dev";
+
+async function runD1Sql(sql) {
+  const tempFileName = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}.sql`;
+  const tempFilePath = path.resolve(__dirname, tempFileName);
+  fs.writeFileSync(tempFilePath, sql, 'utf8');
+  const res = spawnSync('node', ['run-wrangler.js', 'd1', 'execute', 'line-checkin-db', '--remote', `--file=./${tempFileName}`, '-y'], {
+    env: process.env,
+    shell: false,
+    cwd: __dirname,
+    encoding: 'utf8'
+  });
+  if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+  return res.status === 0;
+}
 
 async function runTest() {
   console.log("================================================================================");
@@ -24,8 +60,13 @@ async function runTest() {
     }
   }
 
-  // 1. Health check & Admin Portal UI
-  console.log("--- 1. 系統基礎端點與地端管理入口驗證 ---");
+  let adminApiKey = "";
+  let readonlyApiKey = "";
+  let qaApiKey = "";
+
+  try {
+    // 1. Health check & Admin Portal UI
+    console.log("--- 1. 系統基礎端點與地端管理入口驗證 ---");
   const healthResp = await fetch(`${BASE_URL}/api/health`);
   assert("API Health 檢查 200 OK", healthResp.status === 200);
 
@@ -36,9 +77,6 @@ async function runTest() {
 
   // 2. Tenant API Key Provisioning
   console.log("\n--- 2. 租戶 API 金鑰簽發與 RBAC 角色測試 ---");
-  let adminApiKey = "";
-  let readonlyApiKey = "";
-  let qaApiKey = "";
 
   const adminKeyResp = await fetch(`${BASE_URL}/api/v1/tenant/keys`, {
     method: "POST",
@@ -161,6 +199,14 @@ async function runTest() {
   const qaLocData = await qaLocResp.json();
   assert("測試人員沙盒金鑰驗證通過 (200 OK)", qaLocResp.status === 200 && qaLocData.companyTaxId === "00000000");
   assert("測試人員環境與真實客戶資料 100% 實體隔離 (零客戶資料外洩)", qaLocData.locations.every(l => l.taxId === "00000000"));
+  } finally {
+    console.log("\n🧹 清理租戶架構測試據點與測試金鑰 (Teardown)...");
+    await runD1Sql(`
+      DELETE FROM tenant_api_keys WHERE tax_id IN ('24549210', '00000000') AND (name LIKE '%測試%' OR name LIKE '%美德總部%');
+      DELETE FROM locations WHERE id = '24549210-08';
+    `);
+    console.log("  ✅ 測試據點 24549210-08 與關聯測試金鑰清理完成。");
+  }
 
   console.log("\n================================================================================");
   console.log(`🏁 TEST SUMMARY: ${passed} PASSED, ${failed} FAILED.`);

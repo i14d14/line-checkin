@@ -9,10 +9,47 @@
  * 5. Admin portal (/admin) displays updated security & audit monitoring UI
  */
 
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+
+const envPath = path.resolve(__dirname, '../.env');
+if (fs.existsSync(envPath)) {
+  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx !== -1) {
+      const key = trimmed.slice(0, idx).trim();
+      let val = trimmed.slice(idx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      process.env[key] = val;
+    }
+  }
+}
+
 const BASE_URL = "https://line-checkin-worker.i14d142.workers.dev";
 const TEST_TAX_ID = "24549210";
+const TEST_LOC_ID = `${TEST_TAX_ID}-TEST-SWITCH`;
 const TEST_USER_ID = "U_test_device_switch_" + Date.now();
 const TEST_USER_NAME = "換機測試員工";
+
+async function runD1Sql(sql) {
+  const tempFileName = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}.sql`;
+  const tempFilePath = path.resolve(__dirname, tempFileName);
+  fs.writeFileSync(tempFilePath, sql, 'utf8');
+  const res = spawnSync('node', ['run-wrangler.js', 'd1', 'execute', 'line-checkin-db', '--remote', `--file=./${tempFileName}`, '-y'], {
+    env: process.env,
+    shell: false,
+    cwd: __dirname,
+    encoding: 'utf8'
+  });
+  if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+  return res.status === 0;
+}
 
 async function runTest() {
   console.log("================================================================================");
@@ -34,8 +71,9 @@ async function runTest() {
     }
   }
 
-  // Step 1: Issue Admin API Key for audit verification
-  console.log("--- 1. 取得企業租戶金鑰 ---");
+  try {
+    // Step 1: Issue Admin API Key for audit verification
+    console.log("--- 1. 取得企業租戶金鑰 ---");
   const keyResp = await fetch(`${BASE_URL}/api/v1/tenant/keys`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -45,14 +83,14 @@ async function runTest() {
   assert("簽發測試租戶 API Key 成功", keyResp.status === 200 && keyData.apiKey);
   const tenantApiKey = keyData.apiKey;
 
-  // Step 2: Ensure test location exists
+  // Step 2: Ensure test location exists (dedicated test location to avoid polluting production HQ)
   console.log("\n--- 2. 確認測試據點存在 ---");
   const locResp = await fetch(`${BASE_URL}/api/v1/tenant/locations`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Tenant-Key": tenantApiKey },
     body: JSON.stringify({
-      id: `${TEST_TAX_ID}-01`,
-      name: "豬毛有限公司 - 台中美德總部",
+      id: TEST_LOC_ID,
+      name: "換機測試專屬據點",
       address: "台中市北區美德街56-11號",
       target_lat: 24.1565,
       target_lon: 120.6835,
@@ -81,7 +119,7 @@ async function runTest() {
       fallbackUserId: TEST_USER_ID,
       fallbackDisplayName: TEST_USER_NAME,
       deviceId: deviceA,
-      companyId: `${TEST_TAX_ID}-01`,
+      companyId: TEST_LOC_ID,
       latitude: 24.1565,
       longitude: 120.6835
     })
@@ -100,7 +138,7 @@ async function runTest() {
       fallbackUserId: TEST_USER_ID,
       fallbackDisplayName: TEST_USER_NAME,
       deviceId: deviceA,
-      companyId: `${TEST_TAX_ID}-01`,
+      companyId: TEST_LOC_ID,
       latitude: 24.1565,
       longitude: 120.6835
     })
@@ -120,7 +158,7 @@ async function runTest() {
       fallbackUserId: TEST_USER_ID,
       fallbackDisplayName: TEST_USER_NAME,
       deviceId: deviceB,
-      companyId: `${TEST_TAX_ID}-01`,
+      companyId: TEST_LOC_ID,
       latitude: 24.1565,
       longitude: 120.6835,
       confirmDeviceSwitch: false
@@ -142,7 +180,7 @@ async function runTest() {
       fallbackUserId: TEST_USER_ID,
       fallbackDisplayName: TEST_USER_NAME,
       deviceId: deviceB,
-      companyId: `${TEST_TAX_ID}-01`,
+      companyId: TEST_LOC_ID,
       latitude: 24.1565,
       longitude: 120.6835,
       confirmDeviceSwitch: true
@@ -183,6 +221,18 @@ async function runTest() {
   assert("後台頁面包含「安全稽核與換機監控」模組", adminUiHtml.includes("安全稽核與換機監控") && adminUiHtml.includes("SWITCH_DEVICE"));
   assert("後台已移除手動解綁輸入框 (unbindUserId)", !adminUiHtml.includes("unbindUserId"));
   assert("後台已移除手動解綁函數 (unbindDevice)", !adminUiHtml.includes("unbindDevice()"));
+  } finally {
+    console.log("\n🧹 清理換機測試據點與測試實體 (Teardown)...");
+    await runD1Sql(`
+      DELETE FROM device_audit_logs WHERE line_user_id = '${TEST_USER_ID}';
+      DELETE FROM user_devices WHERE line_user_id = '${TEST_USER_ID}';
+      DELETE FROM checkin_records WHERE line_user_id = '${TEST_USER_ID}';
+      DELETE FROM company_employees WHERE line_user_id = '${TEST_USER_ID}';
+      DELETE FROM tenant_api_keys WHERE tax_id = '${TEST_TAX_ID}' AND name = '換機測試租戶金鑰';
+      DELETE FROM locations WHERE id = '${TEST_LOC_ID}';
+    `);
+    console.log(`  ✅ 換機測試據點 ${TEST_LOC_ID} 與關聯測試資料清理完成。`);
+  }
 
   console.log("\n================================================================================");
   console.log(`🎉 TEST COMPLETED: ${passed} PASSED, ${failed} FAILED`);

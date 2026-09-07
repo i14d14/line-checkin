@@ -17,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 const envPath = path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -68,6 +69,42 @@ async function sendWebhookPostback(userId, approvalId, action) {
   return await res.json();
 }
 
+async function sendWebhookTextMessage(userId, text) {
+  const res = await fetch(`${WORKER_URL}/api/webhook`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      events: [
+        {
+          type: "message",
+          replyToken: "bpm_test_reply_token",
+          source: { userId },
+          message: {
+            type: "text",
+            id: `msg_${Date.now()}`,
+            text: text
+          }
+        }
+      ]
+    })
+  });
+  return await res.json();
+}
+
+async function runD1Sql(sql) {
+  const tempFileName = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}.sql`;
+  const tempFilePath = path.resolve(__dirname, tempFileName);
+  fs.writeFileSync(tempFilePath, sql, 'utf8');
+  const res = spawnSync('node', ['run-wrangler.js', 'd1', 'execute', 'line-checkin-db', '--remote', `--file=./${tempFileName}`, '-y'], {
+    env: process.env,
+    shell: false,
+    cwd: __dirname,
+    encoding: 'utf8'
+  });
+  if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+  return res.status === 0;
+}
+
 async function runTests() {
   console.log("================================================================================");
   console.log("🚀 STARTING AUTOMATED TEST: IN-CHAT BPM APPROVAL WORKFLOW (v2.0.0 / Schema v9)");
@@ -87,9 +124,10 @@ async function runTests() {
     }
   }
 
-  // 1. UI Verification
-  console.log("--- 1. 前端 UI 簽核入口與後台分頁驗證 ---");
-  const liffResp = await fetch(`${WORKER_URL}/checkin`);
+  try {
+    // 1. UI Verification
+    console.log("--- 1. 前端 UI 簽核入口與後台分頁驗證 ---");
+    const liffResp = await fetch(`${WORKER_URL}/checkin`);
   const liffHtml = await liffResp.text();
   assert("LIFF 頁面 200 OK", liffResp.status === 200);
   assert("LIFF 導覽列包含【線上簽核】分頁 (nav-approvals)", liffHtml.includes("nav-approvals") && liffHtml.includes("線上簽核"));
@@ -317,6 +355,77 @@ async function runTests() {
   });
   const approvedFilterData = await approvedFilterResp.json();
   assert("狀態篩選 (APPROVED) 正確運作", approvedFilterData.approvals.every(a => a.status === "APPROVED"));
+
+  // 15. In-Chat Custom Rejection Reason Flow (v2.11.0)
+  console.log("\n--- 15. 主管自訂駁回理由流程驗證 (In-Chat Rejection Reason Flow) ---");
+  // 15.1 Submit a new leave request for rejection testing
+  const rejectTestResp = await fetch(`${WORKER_URL}/api/v1/approval/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fallbackUserId: TEST_EMP_2,
+      fallbackDisplayName: "李小華",
+      fallbackCompanyId: TEST_LOC_ID,
+      type: "LEAVE",
+      targetDate: "2026-09-25",
+      details: { leave_type: "事假", time_range: "全天", reason: "家中有事" }
+    })
+  });
+  const rejectTestData = await rejectTestResp.json();
+  const testApprId = rejectTestData.id;
+  assert("提交待駁回測試請假申請 200 OK", rejectTestResp.status === 200 && rejectTestData.success === true);
+
+  // 15.2 Empty rejection reason prompt check
+  const emptyReasonMsg = await sendWebhookTextMessage(TEST_MGR_FALLBACK, `【駁回 #${testApprId}】原因：   `);
+  assert("空駁回理由 Webhook 處理 200 OK", emptyReasonMsg.success === true);
+  const checkEmptyResp = await fetch(`${WORKER_URL}/api/v1/approval/my?userId=${TEST_EMP_2}`);
+  const checkEmptyData = await checkEmptyResp.json();
+  const emptyAppr = checkEmptyData.approvals.find(a => a.id === testApprId);
+  assert("空駁回理由不變更單據狀態 (維持 PENDING)", emptyAppr && emptyAppr.status === "PENDING");
+
+  // 15.3 Unauthorized stranger attempting to reject with reason
+  const strangerMsg = await sendWebhookTextMessage(TEST_STRANGER, `【駁回 #${testApprId}】原因：非主管駁回測試`);
+  assert("非指定主管駁回 Webhook 處理 200 OK", strangerMsg.success === true);
+  const checkStrangerResp2 = await fetch(`${WORKER_URL}/api/v1/approval/my?userId=${TEST_EMP_2}`);
+  const checkStrangerData2 = await checkStrangerResp2.json();
+  const strangerAppr2 = checkStrangerData2.approvals.find(a => a.id === testApprId);
+  assert("非指定主管駁回被攔截 (維持 PENDING)", strangerAppr2 && strangerAppr2.status === "PENDING");
+
+  // 15.4 Legitimate manager submits custom rejection reason
+  const validRejectReason = "當日為門市全體大盤點日，全體同仁禁休";
+  const validRejectMsg = await sendWebhookTextMessage(TEST_MGR_FALLBACK, `【駁回 #${testApprId}】原因：${validRejectReason}`);
+  assert("合法主管提交駁回理由 Webhook 處理 200 OK", validRejectMsg.success === true);
+
+  const checkFinalResp = await fetch(`${WORKER_URL}/api/v1/approval/my?userId=${TEST_EMP_2}`);
+  const checkFinalData = await checkFinalResp.json();
+  const finalAppr = checkFinalData.approvals.find(a => a.id === testApprId);
+  assert("主管提交理由後單據狀態變更為 REJECTED", finalAppr && finalAppr.status === "REJECTED");
+  assert("單據記錄 decided_at 審核時間", !!finalAppr?.decided_at);
+
+  let finalDetails = {};
+  try { finalDetails = JSON.parse(finalAppr.details || "{}"); } catch (e) {}
+  assert("駁回原因結構化寫入 details.reject_reason", finalDetails.reject_reason === validRejectReason);
+
+  // 15.5 Idempotency: Attempt to reject again
+  const duplicateRejectMsg = await sendWebhookTextMessage(TEST_MGR_FALLBACK, `【駁回 #${testApprId}】原因：再次駁回嘗試`);
+  assert("重複駁回 Webhook 處理 200 OK (防呆)", duplicateRejectMsg.success === true);
+  const checkDupeResp = await fetch(`${WORKER_URL}/api/v1/approval/my?userId=${TEST_EMP_2}`);
+  const checkDupeData = await checkDupeResp.json();
+  const dupeAppr = checkDupeData.approvals.find(a => a.id === testApprId);
+  let dupeDetails = {};
+  try { dupeDetails = JSON.parse(dupeAppr.details || "{}"); } catch (e) {}
+  assert("重複駁回不覆蓋原審核理由", dupeDetails.reject_reason === validRejectReason);
+  } finally {
+    console.log(`\n🧹 清理 BPM 測試據點與測試實體 (Teardown)...`);
+    await runD1Sql(`
+      DELETE FROM approvals WHERE company_id = '${TEST_LOC_ID}';
+      DELETE FROM employee_schedules WHERE company_id = '${TEST_LOC_ID}';
+      DELETE FROM checkin_records WHERE company_id = '${TEST_LOC_ID}' OR line_user_id IN ('${TEST_EMP_1}', '${TEST_EMP_2}', '${TEST_EMP_3}');
+      DELETE FROM company_employees WHERE company_id = '${TEST_LOC_ID}' OR line_user_id IN ('${TEST_EMP_1}', '${TEST_EMP_2}', '${TEST_EMP_3}', '${TEST_MGR_DIRECT}', '${TEST_MGR_FALLBACK}', '${TEST_STRANGER}');
+      DELETE FROM locations WHERE id = '${TEST_LOC_ID}';
+    `);
+    console.log(`  ✅ BPM 測試據點 ${TEST_LOC_ID} 與關聯測試資料清理完成。`);
+  }
 
   // Summary
   console.log("\n================================================================================");
