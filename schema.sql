@@ -160,3 +160,38 @@ CREATE INDEX IF NOT EXISTS idx_approvals_approver_status ON approvals (approver_
 CREATE INDEX IF NOT EXISTS idx_approvals_user ON approvals (line_user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_approvals_company ON approvals (company_id, created_at);
 
+-- Table: cron_notifications (Idempotent Scheduled Push Notifications - Schema v11)
+CREATE TABLE IF NOT EXISTS cron_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    line_user_id TEXT NOT NULL,
+    work_date TEXT NOT NULL,
+    type TEXT NOT NULL,           -- 'REMIND_IN', 'REMIND_OUT'
+    shift_time TEXT,
+    sent_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
+    UNIQUE(line_user_id, work_date, type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cron_notif ON cron_notifications (line_user_id, work_date, type);
+
+-- Table: announcements (Company Announcements & Multicast Notices - Schema v12)
+CREATE TABLE IF NOT EXISTS announcements (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_announcements_company ON announcements (company_id);
+
+-- Table: announcement_reads (Read Receipt Acknowledgement Logs - Schema v12)
+CREATE TABLE IF NOT EXISTS announcement_reads (
+    announcement_id TEXT NOT NULL,
+    line_user_id TEXT NOT NULL,
+    read_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
+    PRIMARY KEY (announcement_id, line_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_announcement_reads_id ON announcement_reads (announcement_id);
+

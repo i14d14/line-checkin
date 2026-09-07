@@ -6,11 +6,20 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "line-checkin-db",
       "database_id": "d331ccb9-3aa5-48bd-8803-5e074e38b1c2"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ATTACHMENTS_BUCKET",
+      "bucket_name": "line-checkin-attachments"
     }
   ],
   "vars": {
