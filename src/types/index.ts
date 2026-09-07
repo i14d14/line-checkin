@@ -66,7 +66,7 @@ export interface DayAttendanceAudit {
   shiftName: string;
   shiftStart: string | null;
   shiftEnd: string | null;
-  status: "NORMAL" | "LATE" | "EARLY_LEAVE" | "LATE_AND_EARLY" | "MISSING_IN" | "MISSING_OUT" | "ABSENT" | "OVERTIME" | "REST_DAY" | "SCHEDULED" | "LEAVE" | "TODAY";
+  status: "NORMAL" | "LATE" | "EARLY_LEAVE" | "LATE_AND_EARLY" | "MISSING_IN" | "MISSING_OUT" | "ABSENT" | "OVERTIME" | "REST_DAY" | "SCHEDULED" | "LEAVE" | "TODAY" | "UNSCHEDULED" | "UNSCHEDULED_WORK";
   statusText: string;
   statusColor: string;
   firstInTime: string | null;
@@ -151,6 +151,22 @@ export interface UserPermissionContext {
   employeeName: string | null;
   permissions: string[];
   isManager: boolean;
+}
+
+export type ScheduleMode = "FIXED" | "SHIFT";
+
+export interface CompanyEmployee {
+  id: number;
+  company_id: string;
+  line_user_id: string;
+  employee_name: string | null;
+  approver_line_id: string | null;
+  permissions: string[];
+  schedule_mode: ScheduleMode;
+  default_shift_start?: string | null;
+  default_shift_end?: string | null;
+  default_break_minutes?: number;
+  created_at: string;
 }
 
 export type ApprovalType = "LEAVE" | "CORRECTION" | "OVERTIME";

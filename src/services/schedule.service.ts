@@ -20,14 +20,6 @@ export function auditDayAttendance(
   // Timezone-agnostic Day of Week calculation (deterministic UTC calendar anchor)
   const [y, m, d] = dateStr.split("-").map(Number);
   const dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-  const rawShiftName = schedule ? schedule.shift_name : (dayOfWeek === 0 || dayOfWeek === 6 ? "例假" : "常態班");
-  const isLeaveShift = rawShiftName.includes("請假");
-  const isStandardWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  const isRest = schedule ? schedule.is_rest_day === 1 : isStandardWeekend;
-  const shiftName = rawShiftName;
-  const shiftStart = schedule?.shift_start || (isRest && !isLeaveShift ? null : "09:00");
-  const shiftEnd = schedule?.shift_end || (isRest && !isLeaveShift ? null : "18:00");
-
   const validPunches = (punches || []).filter(p => p.status === "SUCCESS" || p.status === "DUPLICATE");
   const inPunches = validPunches.filter(p => p.punch_type === "IN");
   const outPunches = validPunches.filter(p => p.punch_type === "OUT");
@@ -45,6 +37,66 @@ export function auditDayAttendance(
     }
   }
   totalWorkHours = parseFloat(totalWorkHours.toFixed(1));
+
+  // --- SSOT: If NO schedule exists in D1 ---
+  if (!schedule) {
+    if (validPunches.length === 0) {
+      return {
+        date: dateStr,
+        dayOfWeek,
+        isToday: dateStr === todayStr,
+        isRestDay: false,
+        isLeave: false,
+        shiftName: "未排班",
+        shiftStart: null,
+        shiftEnd: null,
+        status: "UNSCHEDULED",
+        statusText: "未排班",
+        statusColor: "gray",
+        firstInTime: null,
+        lastOutTime: null,
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+        workHours: 0,
+        leaveHours: 0,
+        overtimeHours: 0,
+        verifyMode: null,
+        punches: validPunches,
+      };
+    } else {
+      return {
+        date: dateStr,
+        dayOfWeek,
+        isToday: dateStr === todayStr,
+        isRestDay: false,
+        isLeave: false,
+        shiftName: "未排班",
+        shiftStart: null,
+        shiftEnd: null,
+        status: "UNSCHEDULED_WORK",
+        statusText: "未排班出勤",
+        statusColor: "indigo",
+        firstInTime,
+        lastOutTime,
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+        workHours: totalWorkHours,
+        leaveHours: 0,
+        overtimeHours: totalWorkHours,
+        verifyMode: firstIn?.verify_mode || null,
+        punches: validPunches,
+      };
+    }
+  }
+
+  // --- Normal path: Schedule exists in D1 ---
+  const rawShiftName = schedule.shift_name || "常態班";
+  const isLeaveShift = rawShiftName.includes("請假");
+  const isStandardWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const isRest = schedule.is_rest_day === 1;
+  const shiftName = rawShiftName;
+  const shiftStart = schedule.shift_start;
+  const shiftEnd = schedule.shift_end;
 
   let status: "NORMAL" | "LATE" | "EARLY_LEAVE" | "LATE_AND_EARLY" | "MISSING_IN" | "MISSING_OUT" | "ABSENT" | "OVERTIME" | "REST_DAY" | "SCHEDULED" | "LEAVE" | "TODAY" = "NORMAL";
   let statusText = "正常出勤";
@@ -233,6 +285,61 @@ export class ScheduleService {
       scheduleMap.set(s.work_date, s);
     }
 
+    // Check employee schedule_mode: If FIXED and month has NO schedules, auto-materialize into D1
+    const empInfo = await this.repo.getEmployeeInfo(targetUserId);
+    const scheduleMode = empInfo?.schedule_mode || "FIXED";
+
+    if (scheduleMode === "FIXED" && schedules.length === 0) {
+      const defaultCompanyId = empInfo?.company_id || "24549210-01";
+      const startShift = empInfo?.default_shift_start || "09:00";
+      const endShift = empInfo?.default_shift_end || "18:00";
+      const breakMins = empInfo?.default_break_minutes || 60;
+
+      const toInsert: Array<{
+        company_id: string;
+        line_user_id: string;
+        work_date: string;
+        shift_name: string;
+        shift_start: string | null;
+        shift_end: string | null;
+        break_minutes: number;
+        is_rest_day: number;
+        is_cross_day: number;
+      }> = [];
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dStr = `${targetMonth}-${day.toString().padStart(2, "0")}`;
+        const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+        toInsert.push({
+          company_id: defaultCompanyId,
+          line_user_id: targetUserId,
+          work_date: dStr,
+          shift_name: isWeekend ? "例假" : "常態班",
+          shift_start: isWeekend ? null : startShift,
+          shift_end: isWeekend ? null : endShift,
+          break_minutes: isWeekend ? 0 : breakMins,
+          is_rest_day: isWeekend ? 1 : 0,
+          is_cross_day: 0,
+        });
+      }
+
+      await this.repo.batchInsertDefaultSchedules(toInsert);
+
+      for (const s of toInsert) {
+        scheduleMap.set(s.work_date, {
+          work_date: s.work_date,
+          shift_name: s.shift_name,
+          shift_start: s.shift_start,
+          shift_end: s.shift_end,
+          break_minutes: s.break_minutes,
+          is_rest_day: s.is_rest_day,
+          is_cross_day: s.is_cross_day,
+        });
+      }
+    }
+
     const punchesMap = new Map<string, any[]>();
     for (const p of punches) {
       const pDate = p.created_at.slice(0, 10);
@@ -265,7 +372,7 @@ export class ScheduleService {
 
       totalWorkHours += audit.workHours;
       totalLeaveHours += (audit.leaveHours || 0);
-      if (audit.workHours > 0 || ["NORMAL", "LATE", "EARLY_LEAVE", "LATE_AND_EARLY", "OVERTIME"].includes(audit.status)) {
+      if (audit.workHours > 0 || ["NORMAL", "LATE", "EARLY_LEAVE", "LATE_AND_EARLY", "OVERTIME", "UNSCHEDULED_WORK"].includes(audit.status)) {
         attendanceDays++;
       }
       if (audit.lateMinutes > 5) lateCount++;
@@ -322,6 +429,68 @@ export class ScheduleService {
     return {
       insertedCount,
       message: `成功更新 ${insertedCount} 筆排班資料。`
+    };
+  }
+
+  /**
+   * Batch generate default schedules for all FIXED employees of a tenant for a given month.
+   */
+  async generateFixedMonthSchedules(taxId: string, month: string): Promise<{ createdCount: number; employeeCount: number; message: string }> {
+    const [yearStr, monthStr] = month.split("-");
+    const year = parseInt(yearStr, 10);
+    const m = parseInt(monthStr, 10);
+    if (isNaN(year) || isNaN(m) || m < 1 || m > 12) {
+      throw new Error("無效的月份格式 (請使用 YYYY-MM)");
+    }
+    const daysInMonth = new Date(year, m, 0).getDate();
+
+    const employees = await this.repo.getFixedEmployeesForTenant(taxId);
+    if (employees.length === 0) {
+      return { createdCount: 0, employeeCount: 0, message: "本企業目前沒有設定為固定班 (FIXED) 的員工。" };
+    }
+
+    const allSchedulesToInsert: Array<{
+      company_id: string;
+      line_user_id: string;
+      work_date: string;
+      shift_name: string;
+      shift_start: string | null;
+      shift_end: string | null;
+      break_minutes: number;
+      is_rest_day: number;
+      is_cross_day: number;
+    }> = [];
+
+    for (const emp of employees) {
+      const companyId = emp.company_id || `${taxId}-01`;
+      const startShift = emp.default_shift_start || "09:00";
+      const endShift = emp.default_shift_end || "18:00";
+      const breakMins = emp.default_break_minutes || 60;
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dStr = `${month}-${day.toString().padStart(2, "0")}`;
+        const dayOfWeek = new Date(Date.UTC(year, m - 1, day)).getUTCDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+        allSchedulesToInsert.push({
+          company_id: companyId,
+          line_user_id: emp.line_user_id,
+          work_date: dStr,
+          shift_name: isWeekend ? "例假" : "常態班",
+          shift_start: isWeekend ? null : startShift,
+          shift_end: isWeekend ? null : endShift,
+          break_minutes: isWeekend ? 0 : breakMins,
+          is_rest_day: isWeekend ? 1 : 0,
+          is_cross_day: 0,
+        });
+      }
+    }
+
+    const createdCount = await this.repo.batchInsertDefaultSchedules(allSchedulesToInsert);
+    return {
+      createdCount,
+      employeeCount: employees.length,
+      message: `成功為 ${employees.length} 位固定班同仁生成 ${month} 月份排班 (新寫入 ${createdCount} 筆，已存在排班自動保留)。`
     };
   }
 }

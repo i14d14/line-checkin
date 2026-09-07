@@ -1,6 +1,6 @@
 {
   "name": "line-checkin-worker",
-  "version": "2.19.0",
+  "version": "2.20.0",
   "description": "LINE GPS Attendance & Check-in System on Cloudflare Workers & D1",
   "main": "src/index.ts",
   "scripts": {
@@ -13,7 +13,8 @@
     "arch:metrics": "depcruise --metrics --output-type metrics src",
     "arch:graph": "depcruise --output-type mermaid src",
     "check": "npm run client:check && npm run typecheck && npm run arch:check",
-    "test": "node test_bpm_approvals.js && node test_company_announcements.js && node test_payslip_distribution.js",
+    "test": "node test_bpm_approvals.js && node test_company_announcements.js && node test_payslip_distribution.js && node test_roster_ssot_and_unscheduled.js",
+    "test:roster": "node test_roster_ssot_and_unscheduled.js",
     "test:announcements": "node test_company_announcements.js",
     "test:payslips": "node test_payslip_distribution.js"
   },

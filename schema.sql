@@ -19,6 +19,10 @@ CREATE TABLE IF NOT EXISTS company_employees (
     employee_name TEXT,
     approver_line_id TEXT DEFAULT NULL, -- 直屬主管 LINE User ID
     permissions TEXT DEFAULT '["punch","apply"]', -- 細粒度原子權限 JSON 陣列 (PBAC)
+    schedule_mode TEXT NOT NULL DEFAULT 'FIXED', -- 工時排班制度: 'FIXED' (常態固定班), 'SHIFT' (門市排班制)
+    default_shift_start TEXT DEFAULT '09:00', -- 常態上班時間
+    default_shift_end TEXT DEFAULT '18:00',   -- 常態下班時間
+    default_break_minutes INTEGER DEFAULT 60, -- 常態休息時間 (分鐘)
     created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
 );
 

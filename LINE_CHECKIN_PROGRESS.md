@@ -2,7 +2,7 @@
 
 > **建立時間**：2026-08-30  
 > **最後更新**：2026-09-07  
-> **當前版本**：`v2.19.0`（實作 Universal Deficit Quota 補請假出勤缺額檢測機制 / 阻擋正常出勤與已全額抵充請假 / LIFF 前端狀態感知提示與按鈕聯鎖 / Schema v12）  
+> **當前版本**：`v2.20.0`（SSOT 實體排班架構、未排班透明感知與固定班一鍵實體化 / 徹底根治定時推播失聯 / D1 company_employees 擴充 schedule_mode 與預設工時欄位 / Schema v13）  
 > **專案定位**：基於 Cloudflare Workers、Cloudflare D1 與 LINE LIFF / Messaging API 的多公司（Multi-Tenant）Serverless GPS 地理圍欄考勤打卡系統。
 > **架構劃分**：我方雲端（24/7 驗證核心）+ 客戶地端（敏感個資/計薪自持 + 自助管理後台）。
 
@@ -76,6 +76,8 @@
 | | 請假專屬狀態 (LEAVE) 暖琥珀色卡 | `[Pending User Verification ⏳]` | 單元測試通過，待實機請假核准後呈現確認 |
 | | 出勤與請假混合工時沖銷 (不誤判加班) | `[User Verified ✅]` | 實機驗證通過，實際工時正常計算、不虛胖 |
 | | 出勤月曆頂部指標卡片 (工時/加班時長/遲到早退/缺卡) | `[User Verified ✅]` | 實機驗證通過，加班時長取代出勤天數，2x2 佈局清晰 |
+| | 未排班透明感知狀態 (UNSCHEDULED 灰白虛線 & UNSCHEDULED_WORK 靛藍出勤) | `[Pending User Verification ⏳]` | **v2.20.0 實體排班 SSOT**：拔除幽靈常態班 fallback，未排班之日無打卡明確呈現 `UNSCHEDULED`（灰白底虛線框，缺卡/遲到/早退為 0），有打卡呈現 `UNSCHEDULED_WORK`（靛藍色，累積工時與出勤天數），33/33 項整合測試 100% 通過 |
+| | 固定班預設班表一鍵實體化 (One-Click Materialization & Auto-Seed) | `[Pending User Verification ⏳]` | **v2.20.0 實體排班 SSOT**：後台提供【⚡ 一鍵生成固定班排班】按鈕與 `POST /api/v1/tenant/schedules/generate`，或由固定班同仁查詢月曆時自動批次寫入 D1 `employee_schedules`，確保實體排班數據存在以觸發定時提醒 |
 | **3. 線上電子簽核** | LIFF 線上簽核入口 (請假/補卡/加班) | `[Fixed - Re-verifying 🔄]` | **v2.15.1 修復 TDZ 變數暫時死區錯誤與送出按鈕卡死問題**：將 `currentApprType` 宣告移至腳本頂部，`handleApprSubmit` 全流程包覆 try-catch-finally 確保任何例外皆自動解鎖按鈕並顯示提示 |
 | | 主管 LINE 聊天室一鍵審核 (Flex Postback) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：修正 Flex 駁回按鈕非規格屬性 `inputOption` 導致的 LINE 400 Bad Request 拒收問題，補發請假單珈妤已全數確認收到卡片 |
 | | 智慧雙軌主管路由 (直屬主管優先 ＞ 店長兜底) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：豬毛請假單正確精準路由至直屬主管珈妤（`U4eb5f204f746d1ab2b360e687eb99105`） |
@@ -1075,6 +1077,30 @@ d:\line-checkin/
     - **成效指標**：
       - `npm run check`（`client:check` + `tsc --noEmit` + `depcruise src`）維持 **0 型別錯誤、0 架構違規**。
       - 擴充 [`test_admin_auth_and_keys.js`](file:///d:/line-checkin/test_admin_auth_and_keys.js) 新增 `-01` 與 `-02` 據點彈窗渲染與刪除按鈕顯示狀態之完整 DOM 虛擬執行驗證（30/30 通過）。
+
+57. **SSOT 實體排班架構、未排班透明感知與固定班一鍵實體化 (SSOT Physical Roster, Unscheduled Transparency & One-Click Materialization ADR v2.20.0 / Schema v13)**：
+    - **背景與痛點根因**：
+      - 使用者反映從未收到過「上班前 15 分鐘 / 下班後 10 分鐘」之定時打卡提醒推播。
+      - 經深度巡檢架構發現核心矛盾：出勤月曆查詢過去在無排班資料時，會在代碼層動態捏造「09:00~18:00 常態班」的虛擬幽靈班表（Ghost Fallback）；而雲端 Cron Worker 巡檢時查詢實體 D1 資料庫（`WHERE work_date = ? AND is_rest_day = 0`），因資料庫無實體資料而查無任何應打卡同仁，導致推播從未觸發。
+      - 同時，排班制同仁（`SHIFT`）若尚未排班，出勤月曆過去會誤顯示為常態班，無法透明看見「未排班」真實狀態。
+    - **架構重構核心措施**：
+      1. **D1 Schema v13 擴充工時制度**：
+         - 於 `company_employees` 新增 `schedule_mode`（`FIXED` 固定班 / `SHIFT` 排班制）、`default_shift_start`（預設 09:00）、`default_shift_end`（預設 18:00）、`default_break_minutes`（預設 60）。
+      2. **徹底拔除虛擬幽靈班表，落實未排班狀態機**：
+         - 重構 `ScheduleService.auditDayAttendance`：徹底廢止幽靈常態班 fallback。
+         - 排班制同仁（`SHIFT`）無排班之日，無打卡呈現 `UNSCHEDULED`（未排班，灰白底虛線框，缺卡/遲到/早退為 0）；有打卡則精準呈現 `UNSCHEDULED_WORK`（未排班出勤，靛藍色徽章，累計工時與出勤天數）。
+      3. **固定班實體自動與一鍵實體化**：
+         - `ScheduleService.getMonthlyAttendance`：固定班同仁查詢出勤月曆時，若當月無排班，自動一鍵將整月預設班表（平日 09:00~18:00 常態班、週末例假日）寫入 D1 `employee_schedules`，達成實體落庫。
+         - 提供 `POST /api/v1/tenant/schedules/generate` 專屬 API 與管理後台【⚡ 一鍵生成固定班排班】按鈕，供人資隨時為全體固定班員工批次實體化排班。
+      4. **定時巡檢推播（REMIND_IN / REMIND_OUT）完全對齊**：
+         - Cron Worker 巡檢時直接對齊實體班表，固定班同仁每天於上班前 15 分鐘及下班後 10 分鐘皆能準時收到 Flex 卡片推播；排班制同仁在人資排班後自動納入巡檢。
+      5. **管理後台與 LIFF 前端全面升級**：
+         - 管理後台「員工權限彈窗」支援配置工時制度（`FIXED` vs `SHIFT`）與個人預設班別時間。
+         - LIFF 前端月曆升級支援 `UNSCHEDULED` 灰白虛線未排卡片與 `UNSCHEDULED_WORK` 靛藍標籤。
+    - **成效指標**：
+      - 新增專屬驗證套件 [`test_roster_ssot_and_unscheduled.js`](file:///d:/line-checkin/test_roster_ssot_and_unscheduled.js) **33/33 斷言 100% PASS**。
+      - 全量迴歸測試 131/131 PASS，累計 164 項自動化測試 100% 通過。
+      - `npm run check`（`client:check` + `tsc --noEmit` + `depcruise src`）維持 **0 型別錯誤、0 架構違規**（51 模組、122 依賴）。
 
 ---
 

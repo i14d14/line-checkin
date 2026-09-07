@@ -933,6 +933,12 @@ export function renderLiffScripts(liffId: string): string {
         } else if (day.status === "SCHEDULED") {
           bgClass = "bg-sky-50 border-sky-200 text-sky-800";
           dot = "";
+        } else if (day.status === "UNSCHEDULED") {
+          bgClass = "bg-white border-dashed border-gray-300 text-gray-400";
+          dot = '<span class="text-[8px] text-gray-400 font-mono scale-90">未排</span>';
+        } else if (day.status === "UNSCHEDULED_WORK") {
+          bgClass = "bg-indigo-50 border-indigo-200 text-indigo-800";
+          dot = '<span class="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>';
         } else if (day.isRestDay) {
           bgClass = "bg-gray-100 border-gray-200 text-gray-400";
         }
@@ -1018,9 +1024,11 @@ export function renderLiffScripts(liffId: string): string {
       else if (day.statusColor === "red") badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200";
       else if (day.statusColor === "purple") badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200";
       else if (day.statusColor === "sky" || day.statusColor === "blue") badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200";
+      else if (day.statusColor === "indigo") badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200";
+      else if (day.status === "UNSCHEDULED") badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-dashed border-gray-300";
       else badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600";
 
-      document.getElementById("detailScheduleTime").innerText = (day.shiftStart && day.shiftEnd) ? \`\${day.shiftStart} ~ \${day.shiftEnd}\` : (day.isRestDay ? "例假/休" : "-");
+      document.getElementById("detailScheduleTime").innerText = (day.shiftStart && day.shiftEnd) ? \`\${day.shiftStart} ~ \${day.shiftEnd}\` : (day.status === "UNSCHEDULED" || day.status === "UNSCHEDULED_WORK" ? "未排班" : (day.isRestDay ? "例假/休" : "-"));
       let workHoursDisplay = "-";
       if (day.workHours > 0) {
         workHoursDisplay = \`\${day.workHours} 小時\`;

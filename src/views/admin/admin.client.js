@@ -406,6 +406,36 @@ const API_BASE = window.location.origin;
       }
     }
 
+    async function generateFixedSchedules() {
+      const monthInput = document.getElementById('scheduleMonth');
+      let month = monthInput ? monthInput.value : '';
+      if (!month) {
+        const d = new Date();
+        month = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      }
+
+      if (!confirm('確認為全體「常態固定班 (FIXED)」同仁一鍵生成 ' + month + ' 月份常態排班？\n（週一至週五 09:00~18:00，週六週日例假。既有請假或特殊排班將自動保留）')) {
+        return;
+      }
+
+      try {
+        const resp = await fetch(API_BASE + '/api/v1/tenant/schedules/generate', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ month: month })
+        });
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+          alert(data.message || '生成成功！');
+          fetchSchedules();
+        } else {
+          alert('生成失敗：' + (data.error || '未知錯誤'));
+        }
+      } catch (err) {
+        alert('網路請求失敗：' + err.message);
+      }
+    }
+
     function renderSchedules(schedules) {
       const tbody = document.getElementById('schedulesTableBody');
       if (!schedules || schedules.length === 0) {
@@ -847,6 +877,15 @@ const API_BASE = window.location.origin;
       }
     }
 
+    function togglePermShiftFields() {
+      const isFixed = document.getElementById('permModeFixed')?.checked;
+      const fields = document.getElementById('permFixedShiftFields');
+      if (fields) {
+        if (isFixed) fields.classList.remove('hidden');
+        else fields.classList.add('hidden');
+      }
+    }
+
     function onPermEmployeeSelectChange() {
       const select = document.getElementById('permEmployeeSelect');
       const userId = select.value;
@@ -860,16 +899,39 @@ const API_BASE = window.location.origin;
           const el = document.getElementById('perm_' + k);
           if (el) el.checked = perms.includes(k);
         });
+        const mode = emp.schedule_mode || 'FIXED';
+        if (mode === 'SHIFT') {
+          const s = document.getElementById('permModeShift');
+          if (s) s.checked = true;
+        } else {
+          const f = document.getElementById('permModeFixed');
+          if (f) f.checked = true;
+        }
+        if (document.getElementById('permDefaultShiftStart')) document.getElementById('permDefaultShiftStart').value = emp.default_shift_start || '09:00';
+        if (document.getElementById('permDefaultShiftEnd')) document.getElementById('permDefaultShiftEnd').value = emp.default_shift_end || '18:00';
+        if (document.getElementById('permDefaultBreakMinutes')) document.getElementById('permDefaultBreakMinutes').value = emp.default_break_minutes || 60;
+        togglePermShiftFields();
       }
     }
 
-    function openEmployeePermissionsModal(empUserId = '', empName = '', perms = ['punch', 'apply']) {
+    function openEmployeePermissionsModal(empUserId = '', empName = '', perms = ['punch', 'apply'], scheduleMode = 'FIXED', shiftStart = '09:00', shiftEnd = '18:00', breakMins = 60) {
       document.getElementById('permLineUserId').value = empUserId;
       document.getElementById('permEmployeeName').value = empName;
       PERM_KEYS.forEach(k => {
         const el = document.getElementById('perm_' + k);
         if (el) el.checked = perms.includes(k);
       });
+      if (scheduleMode === 'SHIFT') {
+        const s = document.getElementById('permModeShift');
+        if (s) s.checked = true;
+      } else {
+        const f = document.getElementById('permModeFixed');
+        if (f) f.checked = true;
+      }
+      if (document.getElementById('permDefaultShiftStart')) document.getElementById('permDefaultShiftStart').value = shiftStart || '09:00';
+      if (document.getElementById('permDefaultShiftEnd')) document.getElementById('permDefaultShiftEnd').value = shiftEnd || '18:00';
+      if (document.getElementById('permDefaultBreakMinutes')) document.getElementById('permDefaultBreakMinutes').value = breakMins || 60;
+      togglePermShiftFields();
       document.getElementById('employeePermissionsModal').classList.remove('hidden');
       loadTenantEmployeesForPerms(empUserId);
     }
@@ -906,13 +968,22 @@ const API_BASE = window.location.origin;
         if (el && el.checked) perms.push(k);
       });
 
+      const scheduleMode = document.querySelector('input[name="permScheduleMode"]:checked')?.value || 'FIXED';
+      const defaultShiftStart = document.getElementById('permDefaultShiftStart')?.value || '09:00';
+      const defaultShiftEnd = document.getElementById('permDefaultShiftEnd')?.value || '18:00';
+      const defaultBreakMinutes = parseInt(document.getElementById('permDefaultBreakMinutes')?.value, 10) || 60;
+
       try {
         const resp = await fetch(API_BASE + '/api/v1/tenant/employees/' + encodeURIComponent(empUserId) + '/permissions', {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
             employeeName: empName || null,
-            permissions: perms
+            permissions: perms,
+            scheduleMode: scheduleMode,
+            defaultShiftStart: defaultShiftStart,
+            defaultShiftEnd: defaultShiftEnd,
+            defaultBreakMinutes: defaultBreakMinutes
           })
         });
         const result = await resp.json();

@@ -268,7 +268,15 @@ export class TenantService {
     lineToken: string | undefined,
     auth: TenantAuthResult,
     targetEmpIdOrUserId: string,
-    body: { permissions?: string[]; employeeName?: string; companyId?: string }
+    body: {
+      permissions?: string[];
+      employeeName?: string;
+      companyId?: string;
+      scheduleMode?: string;
+      defaultShiftStart?: string;
+      defaultShiftEnd?: string;
+      defaultBreakMinutes?: number;
+    }
   ): Promise<{ status: number; body: any }> {
     if (auth.role !== "ADMIN") {
       return { status: 403, body: { success: false, error: "僅 ADMIN 角色具備權限變更權限" } };
@@ -281,12 +289,20 @@ export class TenantService {
     const permissions = Array.isArray(body.permissions) ? body.permissions : ["punch", "apply"];
     const effectiveCompanyId = body.companyId || auth.taxId!;
     const permStr = JSON.stringify(permissions);
+    const scheduleMode = body.scheduleMode || "FIXED";
+    const defaultShiftStart = body.defaultShiftStart || "09:00";
+    const defaultShiftEnd = body.defaultShiftEnd || "18:00";
+    const defaultBreakMinutes = typeof body.defaultBreakMinutes === "number" ? body.defaultBreakMinutes : 60;
 
     await this.repo.upsertEmployeePermissions(
       effectiveCompanyId,
       targetEmpIdOrUserId.trim(),
       body.employeeName || null,
-      permStr
+      permStr,
+      scheduleMode,
+      defaultShiftStart,
+      defaultShiftEnd,
+      defaultBreakMinutes
     );
 
     if (lineToken) {

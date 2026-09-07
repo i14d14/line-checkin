@@ -214,6 +214,41 @@ export function renderAdminModals(): string {
           </div>
         </div>
 
+        <!-- Schedule Mode Section -->
+        <div class="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+          <label class="block font-bold text-gray-800">🕒 工時排班制度：</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <label class="flex items-center space-x-2 p-2 rounded-lg bg-white border border-gray-200 cursor-pointer hover:border-indigo-400">
+              <input type="radio" name="permScheduleMode" id="permModeFixed" value="FIXED" checked onchange="togglePermShiftFields()" class="text-indigo-600 focus:ring-indigo-500">
+              <div>
+                <span class="font-bold text-gray-800">常態固定班 (FIXED)</span>
+                <p class="text-[10px] text-gray-400">週休二日，支援一鍵/自動生成常態排班</p>
+              </div>
+            </label>
+            <label class="flex items-center space-x-2 p-2 rounded-lg bg-white border border-gray-200 cursor-pointer hover:border-indigo-400">
+              <input type="radio" name="permScheduleMode" id="permModeShift" value="SHIFT" onchange="togglePermShiftFields()" class="text-indigo-600 focus:ring-indigo-500">
+              <div>
+                <span class="font-bold text-gray-800">門市排班制 (SHIFT)</span>
+                <p class="text-[10px] text-gray-400">無排班顯示「未排班」，不自動推論有班</p>
+              </div>
+            </label>
+          </div>
+          <div id="permFixedShiftFields" class="grid grid-cols-3 gap-2 pt-1 text-[11px]">
+            <div>
+              <label class="block text-gray-600 mb-0.5">預設上班</label>
+              <input type="time" id="permDefaultShiftStart" value="09:00" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">
+            </div>
+            <div>
+              <label class="block text-gray-600 mb-0.5">預設下班</label>
+              <input type="time" id="permDefaultShiftEnd" value="18:00" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">
+            </div>
+            <div>
+              <label class="block text-gray-600 mb-0.5">休息(分)</label>
+              <input type="number" id="permDefaultBreakMinutes" value="60" min="0" max="240" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">
+            </div>
+          </div>
+        </div>
+
         <!-- Quick Presets -->
         <div>
           <label class="block font-medium text-gray-700 mb-1.5">⚡ 角色快捷套用範本：</label>

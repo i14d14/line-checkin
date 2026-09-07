@@ -34,6 +34,10 @@ export function renderAdminTabs(): string {
               <p class="text-xs text-gray-500 mt-0.5">支援匯入整月員工班表，作為系統精準計算遲到、早退、缺卡、加班與實際工時之依據。</p>
             </div>
             <div class="flex items-center space-x-2">
+              <button onclick="generateFixedSchedules()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold px-3 py-2 rounded-xl transition flex items-center space-x-1.5" title="為所有固定班 (FIXED) 同仁一鍵建立該月份平日常態班與週末例假">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>一鍵生成固定班排班</span>
+              </button>
               <button onclick="downloadScheduleTemplate()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl transition flex items-center space-x-1.5">
                 <i class="fa-solid fa-download"></i>
                 <span>下載 CSV 範本</span>

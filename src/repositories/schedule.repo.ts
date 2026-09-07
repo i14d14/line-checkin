@@ -1,4 +1,4 @@
-import { DailySchedule } from "../types";
+import { DailySchedule, CompanyEmployee } from "../types";
 
 export interface ScheduleQueryFilters {
   month?: string | null;
@@ -122,5 +122,81 @@ export class ScheduleRepository {
 
     const { results } = await this.db.prepare(sql).bind(...params).all();
     return results || [];
+  }
+
+  /**
+   * Fetch single employee info including schedule_mode and default shift.
+   */
+  async getEmployeeInfo(lineUserId: string): Promise<CompanyEmployee | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM company_employees WHERE line_user_id = ? LIMIT 1")
+      .bind(lineUserId.trim())
+      .first();
+    return (row as unknown as CompanyEmployee) || null;
+  }
+
+  /**
+   * Fetch all employees for a tenant with schedule_mode = 'FIXED'.
+   */
+  async getFixedEmployeesForTenant(taxId: string): Promise<CompanyEmployee[]> {
+    const { results } = await this.db
+      .prepare(
+        "SELECT * FROM company_employees WHERE (company_id = ? OR company_id LIKE ?) AND schedule_mode = 'FIXED'"
+      )
+      .bind(taxId, `${taxId}-%`)
+      .all();
+    return (results || []) as unknown as CompanyEmployee[];
+  }
+
+  /**
+   * Batch insert default schedules with INSERT OR IGNORE (does not overwrite existing schedules/leaves).
+   */
+  async batchInsertDefaultSchedules(
+    schedules: Array<{
+      company_id: string;
+      line_user_id: string;
+      work_date: string;
+      shift_name: string;
+      shift_start: string | null;
+      shift_end: string | null;
+      break_minutes: number;
+      is_rest_day: number;
+      is_cross_day: number;
+    }>
+  ): Promise<number> {
+    if (!schedules || schedules.length === 0) return 0;
+
+    let inserted = 0;
+    // Chunk by 50 to respect D1 batch limits
+    const chunkSize = 50;
+    for (let i = 0; i < schedules.length; i += chunkSize) {
+      const chunk = schedules.slice(i, i + chunkSize);
+      const stmts = chunk.map((s) =>
+        this.db
+          .prepare(`
+            INSERT OR IGNORE INTO employee_schedules (
+              company_id, line_user_id, work_date, shift_name, shift_start, shift_end, break_minutes, is_rest_day, is_cross_day, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+8 hours'), datetime('now', '+8 hours'))
+          `)
+          .bind(
+            s.company_id,
+            s.line_user_id,
+            s.work_date,
+            s.shift_name,
+            s.shift_start,
+            s.shift_end,
+            s.break_minutes,
+            s.is_rest_day,
+            s.is_cross_day
+          )
+      );
+      const results = await this.db.batch(stmts);
+      for (const r of results) {
+        if (r.meta && (r.meta.changes || 0) > 0) {
+          inserted += r.meta.changes;
+        }
+      }
+    }
+    return inserted;
   }
 }

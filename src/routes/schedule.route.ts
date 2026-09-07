@@ -94,5 +94,33 @@ export async function handleScheduleRoutes(
     }
   }
 
+  // 5. POST /api/v1/tenant/schedules/generate -> Batch generate default schedules for FIXED employees
+  if (url.pathname === "/api/v1/tenant/schedules/generate" && request.method === "POST") {
+    const auth = await authenticateTenantRequest(request, env.DB);
+    if (!auth.authenticated) {
+      return Response.json({ success: false, error: auth.error }, { status: auth.status || 401, headers: corsHeaders });
+    }
+
+    if (auth.role !== "ADMIN") {
+      return Response.json({ success: false, error: "權限不足：僅 ADMIN 角色可生成班表" }, { status: 403, headers: corsHeaders });
+    }
+
+    try {
+      const body = ((await request.json().catch(() => ({}))) || {}) as { month?: string };
+      const targetMonth = body.month || url.searchParams.get("month") || new Date().toISOString().slice(0, 7);
+
+      const result = await service.generateFixedMonthSchedules(auth.taxId!, targetMonth);
+      return Response.json({
+        success: true,
+        message: result.message,
+        createdCount: result.createdCount,
+        employeeCount: result.employeeCount,
+        month: targetMonth,
+      }, { headers: corsHeaders });
+    } catch (err: any) {
+      return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });
+    }
+  }
+
   return null;
 }

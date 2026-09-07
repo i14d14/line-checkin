@@ -27,6 +27,10 @@ export interface TenantEmployeeRow {
   employee_name: string | null;
   approver_line_id: string | null;
   permissions: string | null;
+  schedule_mode?: string;
+  default_shift_start?: string | null;
+  default_shift_end?: string | null;
+  default_break_minutes?: number;
   created_at: string;
   company_name: string | null;
   manager_line_id: string | null;
@@ -107,6 +111,7 @@ export class TenantRepository {
   async listEmployees(taxId: string): Promise<TenantEmployeeRow[]> {
     const { results } = await this.db.prepare(`
       SELECT ce.id, ce.company_id, ce.line_user_id, ce.employee_name, ce.approver_line_id, ce.permissions, ce.created_at,
+             ce.schedule_mode, ce.default_shift_start, ce.default_shift_end, ce.default_break_minutes,
              l.name as company_name, l.manager_line_id
       FROM company_employees ce
       LEFT JOIN locations l ON ce.company_id = l.id
@@ -120,16 +125,24 @@ export class TenantRepository {
     effectiveCompanyId: string,
     lineUserId: string,
     employeeName: string | null,
-    permStr: string
+    permStr: string,
+    scheduleMode: string = "FIXED",
+    defaultShiftStart: string = "09:00",
+    defaultShiftEnd: string = "18:00",
+    defaultBreakMinutes: number = 60
   ): Promise<void> {
     await this.db.prepare(`
-      INSERT INTO company_employees (company_id, line_user_id, employee_name, permissions)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO company_employees (company_id, line_user_id, employee_name, permissions, schedule_mode, default_shift_start, default_shift_end, default_break_minutes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(line_user_id) DO UPDATE SET
         company_id = excluded.company_id,
         employee_name = COALESCE(excluded.employee_name, company_employees.employee_name),
-        permissions = excluded.permissions
-    `).bind(effectiveCompanyId, lineUserId.trim(), employeeName || null, permStr).run();
+        permissions = excluded.permissions,
+        schedule_mode = excluded.schedule_mode,
+        default_shift_start = excluded.default_shift_start,
+        default_shift_end = excluded.default_shift_end,
+        default_break_minutes = excluded.default_break_minutes
+    `).bind(effectiveCompanyId, lineUserId.trim(), employeeName || null, permStr, scheduleMode, defaultShiftStart, defaultShiftEnd, defaultBreakMinutes).run();
   }
 
   async isStoreManager(lineUserId: string): Promise<boolean> {
