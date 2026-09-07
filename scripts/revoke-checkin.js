@@ -8,15 +8,19 @@
  * Options:
  *   --date <YYYY-MM-DD>  Target date (default: today in Taiwan UTC+8)
  *   --all                Apply to all dates for this user
+ *   --latest             Apply to the latest check-in session/record
+ *   --id <ID>            Target a specific check-in record ID
  *   --delete             Hard delete rows (default: soft-cancel status='CANCELLED')
  *   --list               Preview matching records without making changes
  *   -h, --help           Show this help message
  * 
  * Examples:
  *   node scripts/revoke-checkin.js 豬毛
+ *   node scripts/revoke-checkin.js 豬毛 --latest
+ *   node scripts/revoke-checkin.js 豬毛 --id 682
  *   node scripts/revoke-checkin.js 豬毛 --date 2026-09-05
  *   node scripts/revoke-checkin.js Ubd107bb3ba1b85a8086fc3b2250458e8
- *   node scripts/revoke-checkin.js 豬毛 --delete
+ *   node scripts/revoke-checkin.js 豬毛 --latest --delete
  *   node scripts/revoke-checkin.js --list
  */
 
@@ -110,15 +114,19 @@ async function main() {
 選項說明：
   --date <YYYY-MM-DD>  指定目標日期（預設為今日台灣時間: ${getTodayTaiwan()}）
   --all                撤銷該用戶所有日期的紀錄
+  --latest             撤銷該用戶最新一筆/批次打卡紀錄
+  --id <ID>            撤銷指定打卡紀錄 ID
   --delete             完全物理刪除紀錄（預設為安全標記 CANCELLED）
   --list               僅查詢列出目標打卡紀錄，不執行變更
   -h, --help           顯示此說明
 
 常見範例：
   node scripts/revoke-checkin.js 豬毛
+  node scripts/revoke-checkin.js 豬毛 --latest
+  node scripts/revoke-checkin.js 豬毛 --id 682
   node scripts/revoke-checkin.js 豬毛 --date ${getTodayTaiwan()}
   node scripts/revoke-checkin.js Ubd107bb3ba1b85a8086fc3b2250458e8
-  node scripts/revoke-checkin.js 豬毛 --delete
+  node scripts/revoke-checkin.js 豬毛 --latest --delete
   node scripts/revoke-checkin.js --list
 ────────────────────────────────────────────────────`);
     return;
@@ -127,6 +135,8 @@ async function main() {
   let targetArg = null;
   let targetDate = getTodayTaiwan();
   let isAllDates = false;
+  let isLatest = false;
+  let targetRecordId = null;
   let isHardDelete = false;
   let isListOnly = false;
 
@@ -134,6 +144,10 @@ async function main() {
     const a = args[i];
     if (a === '--all') {
       isAllDates = true;
+    } else if (a === '--latest') {
+      isLatest = true;
+    } else if (a === '--id') {
+      targetRecordId = parseInt(args[++i], 10);
     } else if (a === '--delete') {
       isHardDelete = true;
     } else if (a === '--list') {
@@ -213,17 +227,61 @@ async function main() {
     }
   }
 
+  let scopeDesc = isAllDates ? '全部歷史紀錄' : `日期 ${targetDate}`;
+  if (targetRecordId) {
+    scopeDesc = `指定紀錄 ID ${targetRecordId}`;
+  } else if (isLatest) {
+    scopeDesc = `最新一筆（含連帶同梯打卡紀錄）`;
+  }
+
   console.log(`👤 目標員工：【${targetDisplayName}】(LINE ID: ${targetUserId})`);
-  console.log(`📅 目標範圍：${isAllDates ? '全部歷史紀錄' : `日期 ${targetDate}`}`);
+  console.log(`📅 目標範圍：${scopeDesc}`);
 
   // Query records
-  const dateClause = isAllDates ? '' : `AND date(created_at) = '${targetDate}'`;
-  const records = await queryD1(`
-    SELECT id, punch_type, status, created_at, distance_meters, verify_mode
-    FROM checkin_records
-    WHERE line_user_id = '${targetUserId}' ${dateClause}
-    ORDER BY id ASC;
-  `);
+  let records = [];
+  if (targetRecordId) {
+    records = await queryD1(`
+      SELECT id, punch_type, status, created_at, distance_meters, verify_mode
+      FROM checkin_records
+      WHERE line_user_id = '${targetUserId}' AND id = ${targetRecordId}
+      ORDER BY id ASC;
+    `);
+  } else if (isLatest) {
+    const latestSuccess = await queryD1(`
+      SELECT id, punch_type, status, created_at, distance_meters, verify_mode
+      FROM checkin_records
+      WHERE line_user_id = '${targetUserId}' AND status = 'SUCCESS'
+      ORDER BY id DESC LIMIT 1;
+    `);
+    if (latestSuccess.length > 0) {
+      const s = latestSuccess[0];
+      const cluster = await queryD1(`
+        SELECT id, punch_type, status, created_at, distance_meters, verify_mode
+        FROM checkin_records
+        WHERE line_user_id = '${targetUserId}'
+          AND id >= ${s.id}
+          AND status != 'CANCELLED'
+        ORDER BY id ASC;
+      `);
+      records = cluster.length > 0 ? cluster : latestSuccess;
+    } else {
+      const latestRows = await queryD1(`
+        SELECT id, punch_type, status, created_at, distance_meters, verify_mode
+        FROM checkin_records
+        WHERE line_user_id = '${targetUserId}' AND status != 'CANCELLED'
+        ORDER BY id DESC LIMIT 1;
+      `);
+      records = latestRows;
+    }
+  } else {
+    const dateClause = isAllDates ? '' : `AND date(created_at) = '${targetDate}'`;
+    records = await queryD1(`
+      SELECT id, punch_type, status, created_at, distance_meters, verify_mode
+      FROM checkin_records
+      WHERE line_user_id = '${targetUserId}' ${dateClause}
+      ORDER BY id ASC;
+    `);
+  }
 
   if (records.length === 0) {
     console.log(`ℹ️ 查無符合條件的打卡紀錄，無須處理。`);
@@ -245,21 +303,22 @@ async function main() {
   }
 
   // Execute Revoke / Delete
+  const idList = records.map(r => r.id).join(', ');
   if (isHardDelete) {
     console.log(`\n⚠️ 正在執行【物理刪除 (DELETE)】...`);
     await queryD1(`
       DELETE FROM checkin_records
-      WHERE line_user_id = '${targetUserId}' ${dateClause};
+      WHERE id IN (${idList});
     `);
-    console.log(`✅ 已成功刪除 ${records.length} 筆打卡紀錄。`);
+    console.log(`✅ 已成功刪除 ${records.length} 筆打卡紀錄 (ID: ${idList})。`);
   } else {
     console.log(`\n🔄 正在執行【安全撤銷 (SET status = 'CANCELLED')】...`);
     await queryD1(`
       UPDATE checkin_records
       SET status = 'CANCELLED'
-      WHERE line_user_id = '${targetUserId}' ${dateClause};
+      WHERE id IN (${idList});
     `);
-    console.log(`✅ 已成功將 ${records.length} 筆打卡紀錄標記為 CANCELLED（已撤銷）。`);
+    console.log(`✅ 已成功將 ${records.length} 筆打卡紀錄標記為 CANCELLED（ID: ${idList}）。`);
   }
 
   // Write audit log
