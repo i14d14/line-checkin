@@ -1,4 +1,4 @@
-# LINE Check-in & Attendance System (LINE 企業打卡與差勤系統)
+# LINE Enterprise Attendance & Check-in System
 
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
 [![LINE Messaging API](https://img.shields.io/badge/LINE-Messaging%20API%20v3-00C300?logo=line&logoColor=white)](https://developers.line.biz/)
@@ -7,43 +7,43 @@
 [![Zero Dependency Violations](https://img.shields.io/badge/Architecture-depcruise%200%20violations-blue)](#)
 
 > **Project Scope & Disclaimer**:  
-> An architectural practice project mimicking **NUEiPS (人易科技)** enterprise attendance and leave management solutions, developed as a technical portfolio showcase for interview review.
+> An architectural practice project mimicking **NUEiPS (人易科技)** enterprise attendance and workforce management solutions, developed as a technical portfolio showcase for interview review.
 
 ---
 
-## 📌 模組健全度與測試覆蓋說明 (Maturity & Test Coverage)
+## 📌 Module Maturity & Test Coverage Overview
 
-為便於審查者快速掌握本專案各模組的成熟度與測試深度，本專案依功能劃分為兩大區塊：
+To help reviewers quickly assess the maturity and testing depth across different components, this codebase is categorized into two distinct domains:
 
 ```mermaid
-pie title 功能模組代碼健全度與測試覆蓋分佈
-    "LINE 考勤打卡與審批核心 (高覆蓋 / 239+ 測試)" : 80
-    "多租戶後台與 SaaS 原型 (PoC 原型 / 低覆蓋)" : 20
+pie title Code Maturity & Test Coverage Distribution
+    "Core LINE Attendance & BPM Approval (High Coverage / 239+ Tests)" : 80
+    "Multi-tenant Admin Console & SaaS Prototypes (PoC / Low Coverage)" : 20
 ```
 
-### 🟢 1. 核心高可靠度區塊 —— LINE 考勤打卡與 BPM 審批系統（面試展示重點）
-此區塊為本專案之**核心工程亮點**，具備完整的邊界防禦與端到端自動化測試：
-- **雙軌打卡驗證 (Dual-Track Verification)**：
-  - **IPv4 / IPv6 雙棧白名單**：支援中華電信/寬頻 Wi-Fi 雙棧連線，以 CIDR / IP 精確比對邊緣請求標頭 (`cf-connecting-ip`)。
-  - **GPS 備援與防偽**：未命中 Wi-Fi 時自動切換為 WGS84 座標半徑校驗（Haversine 距離公式），精準判定店舖電子圍欄範圍。
-- **不可竄改打卡狀態機**：
-  - 嚴格管控出勤流水（`IN`、`OUT`、`APPROVED_OVERRIDE`），防止重複打卡與跳過流程。
-  - 具備防重複點擊鎖（Debounce Lock）與 0 重複請求防呆機制。
-- **線上 BPM 審批工作流**：
-  - **請假申請與補卡申請**：整合 Cloudflare R2 物件儲存支援醫療/證明文件上傳。
-  - **嚴格防冒名審批 (Anti-Impersonation)**：Webhook 審批事件由 HMAC-SHA256 簽章驗證，非指定主管操作嚴格維持 `PENDING` 並阻斷出勤變更。
-  - **業務自動連動**：主管一鍵核准後，自動於 D1 排班表標記休假日（`is_rest_day = 1`）並補足出勤打卡流水。
-- **測試保證**：全套 **239+ 項自動化測試**（涵蓋 JSDOM 前端生命週期、D1 邊緣資料庫連動、LINE Flex Message 協議校驗閘、PBAC 權限矩陣），100% 通過。
+### 🟢 1. Core High-Reliability Domain — LINE Attendance & BPM Approval Workflow (Interview Showcase Core)
+This subsystem serves as the **core engineering highlight** of the project, equipped with comprehensive edge perimeter defenses and end-to-end automated testing:
+- **Dual-Track Check-in Verification**:
+  - **Dual-Stack IPv4 / IPv6 Whitelisting**: Supports corporate and ISP broadband dual-stack connections, performing exact IP and CIDR subnet matching against edge request headers (`cf-connecting-ip`).
+  - **GPS Fallback & Anti-Spoofing**: Automatically falls back to WGS84 geodesic radius validation (via the Haversine formula) when Wi-Fi does not match, strictly enforcing location geofencing boundaries.
+- **Immutable Attendance State Machine**:
+  - Strictly governs punch card sequences (`IN`, `OUT`, `APPROVED_OVERRIDE`), blocking duplicate punches and sequence skipping.
+  - Features client-side debounce locking to guarantee zero duplicate submissions under network latency.
+- **Online BPM Approval Workflow**:
+  - **Leave & Make-up Punch Applications**: Integrated with Cloudflare R2 object storage for medical / leave certificate uploads.
+  - **Strict Anti-Impersonation Protection**: Webhook approval events are verified with HMAC-SHA256 signatures; unauthorized approvals strictly preserve the `PENDING` state and reject attendance modifications.
+  - **Automated Business Linking**: Manager approval automatically updates D1 employee schedules (`is_rest_day = 1`) and creates immutable attendance override records.
+- **Verification Guarantee**: A suite of **239+ automated tests** (covering JSDOM frontend lifecycles, Cloudflare D1 edge database transactions, LINE Flex Message protocol validation, and PBAC permission matrices) passing at 100%.
 
-### 🟡 2. 概念原型區塊 —— 多租戶管理後台與排班管理（PoC 原型）
-- **功能範圍**：租戶管理員 Web 登入、門市立牌 QR Code 生成、排班資料匯入、電子薪資條推播等管理介面。
-- **現狀說明**：此區塊主要用於驗證多租戶資料隔離與管理流程架構，**自動化測試覆蓋率較低，目前著重於概念性驗證，可能包含部分未覆蓋之邊界 Bug**。
+### 🟡 2. Exploratory Prototype Domain — Multi-tenant Admin Console & Roster Management (PoC Prototype)
+- **Functional Scope**: HR admin web login, store QR stand generation, CSV roster imports, and electronic payslip distribution.
+- **Current Status**: Designed primarily for architectural exploration of multi-tenant data isolation and administrative workflows. **Automated test coverage is minimal; this area focuses on prototype validation and may contain unhandled edge-case defects.**
 
 ---
 
-## 🏛️ 系統架構與呼叫鏈規範 (Architecture Guardrails)
+## 🏛️ System Architecture & Invocation Guardrails
 
-本專案採用嚴格的四層向下相依架構（Downward Invocation Order），模組間相依性完全由 `dependency-cruiser` 自動化防護，違規即中斷 CI：
+The system strictly adheres to a downward unidirectional dependency hierarchy, continuously enforced by `dependency-cruiser` where violations fail CI:
 
 ```mermaid
 flowchart TD
@@ -62,58 +62,57 @@ flowchart TD
     S -.-> V
 ```
 
-- **Routes (Layer 3)**：輕量 HTTP 控制器，僅負責解析請求與狀態碼分發，不直接接觸資料庫。
-- **Services (Layer 2)**：純領域業務邏輯、考勤狀態機與 PBAC 政策，完全解耦資料存取。
-- **Repositories (Layer 1)**：封裝 D1 關聯式資料庫查詢與事務，不依賴上層業務。
-- **Views & Utils (Layer 0)**：無相依的底層工具、Zod Schema 與 LINE Flex Message 渲染模板。
+- **Routes (Layer 3)**: Thin HTTP transport controllers responsible only for request parsing, parameter validation, and status dispatching.
+- **Services (Layer 2)**: Pure domain business logic, attendance state machines, and PBAC policies, fully decoupled from database queries.
+- **Repositories (Layer 1)**: Encapsulates D1 SQL queries, transactions, and mutations, with zero knowledge of upper business layers.
+- **Views & Utils (Layer 0)**: Zero-dependency shared utilities, Zod validation schemas, and LINE Flex Message builders.
 
 ---
 
-## 📱 實機畫面展示 (UI Demonstration)
+## 📱 User Interface & Flow Demonstration
 
-### 1. 門市打卡與出勤總結
-| 門市 GPS / Wi-Fi 打卡介面 | 打卡成功即時 Flex 卡片 | 每日出勤月曆與工時總結 |
+### 1. Store Check-in & Attendance Summary
+| Store GPS / Wi-Fi Check-in | Instant Check-in Flex Card | Monthly Attendance Calendar & Hours |
 | :---: | :---: | :---: |
-| ![門市打卡](demo_pics/01打卡01.jpg) | ![打卡成功](demo_pics/01打卡02.jpg) | ![出勤月曆](demo_pics/02月曆01月總結.jpg) |
+| ![Store Check-in](demo_pics/01打卡01.jpg) | ![Check-in Receipt](demo_pics/01打卡02.jpg) | ![Monthly Calendar](demo_pics/02月曆01月總結.jpg) |
 
-### 2. 線上請假、補卡與防重複申請
-| 請假申請介面 | 重複請假智慧防呆攔截 | 補卡申請單據 |
+### 2. Online Leave, Make-up Punch & Duplicate Prevention
+| Leave Application Form | Duplicate Leave Smart Defense | Make-up Punch Request |
 | :---: | :---: | :---: |
-| ![請假申請](demo_pics/03請假01.jpg) | ![重複請假防呆](demo_pics/04重複請假01.jpg) | ![補卡申請](demo_pics/06補卡01.jpg) |
+| ![Leave Application](demo_pics/03請假01.jpg) | ![Duplicate Defense](demo_pics/04重複請假01.jpg) | ![Make-up Punch](demo_pics/06補卡01.jpg) |
 
-### 3. 主管審批與門市設定
-| 門市 Wi-Fi IP 一鍵校準 | 主管今日出勤監控面板 | 門市座標電子圍欄校正 |
+### 3. Manager Approval & Store Configuration
+| One-Click Wi-Fi IP Calibration | Manager Daily Attendance Monitor | Geofence Coordinate Calibration |
 | :---: | :---: | :---: |
-| ![Wi-Fi 註冊](demo_pics/07一鍵設置公司IP.jpg) | ![今日總結](demo_pics/主管08觀看今日出勤總結.jpg) | ![座標設定](demo_pics/一鍵設置位置座標.jpg) |
+| ![Wi-Fi Calibration](demo_pics/07一鍵設置公司IP.jpg) | ![Daily Monitor](demo_pics/主管08觀看今日出勤總結.jpg) | ![Coordinate Setup](demo_pics/一鍵設置位置座標.jpg) |
 
 ---
 
-## 🛠️ 技術棧 (Tech Stack)
+## 🛠️ Technology Stack
 
-| 領域 | 技術選型 | 說明 |
+| Domain | Technology | Description |
 | :--- | :--- | :--- |
-| **運算邊緣** | Cloudflare Workers | 全球低延遲 Edge Serverless Runtime，冷啟動 < 15ms |
-| **持久化存儲** | Cloudflare D1 | 邊緣原生分散式 SQLite 資料庫 |
-| **物件儲存** | Cloudflare R2 | S3 相容物件儲存，用於請假附件證明上傳 |
-| **通訊協定** | LINE Messaging API v3 | Webhook 簽名驗證、Flex Message 互動卡片推播 |
-| **前端應用** | LINE LIFF SDK v2 + TypeScript | 運行於 LINE Webview 內之高響應式操作面板 |
-| **架構防護** | TypeScript 5.7 + dependency-cruiser | 靜態型別與依賴架構自動化檢查 |
-| **安全掃描** | Gitleaks | 提交前密鑰高熵檢測與全歷史脫敏防護 |
+| **Edge Compute** | Cloudflare Workers | Global low-latency serverless runtime with < 15ms cold starts |
+| **Persistence** | Cloudflare D1 | Distributed edge-native relational SQLite database |
+| **Object Storage** | Cloudflare R2 | S3-compatible zero-egress bucket for leave attachment uploads |
+| **Messaging** | LINE Messaging API v3 | Webhook signature verification & interactive Flex Message cards |
+| **Client UI** | LINE LIFF SDK v2 + TypeScript | Responsive web view embedded directly inside LINE chat |
+| **Architecture** | TypeScript 5.7 + dependency-cruiser | Static typing and compile-time boundary enforcement |
 
 ---
 
-## 🚀 測試與檢驗指令 (Verification)
+## 🚀 Verification & Testing Commands
 
 ```bash
-# 1. 執行前端構建、型別檢驗與架構相依性審查（0 違規保證）
+# 1. Execute client build, TypeScript typecheck, and architectural dependency cruise (0 violations)
 npm run check
 
-# 2. 執行 LINE Flex Message Protocol Gate 檢驗
+# 2. Run LINE Messaging API v3 Flex Schema Protocol Gate verification
 npm run test:flex
 
-# 3. 執行 Batch 1 線上審批與防冒審測試
+# 3. Run Batch 1 online approval and anti-impersonation test suite
 npm run test:batch1
 
-# 4. 執行完整自動化測試套件（239+ 測試）
+# 4. Run the full automated test suite (239+ tests)
 npm test
 ```
