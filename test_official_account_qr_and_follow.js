@@ -1,7 +1,27 @@
+const fs = require('fs');
+const path = require('path');
 const crypto = require('crypto');
 
-const BASE_URL = "https://line-checkin-worker.i14d142.workers.dev";
-const LINE_CHANNEL_SECRET = "REDACTED_LINE_CHANNEL_SECRET_000";
+const envPath = path.resolve(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx !== -1) {
+      const key = trimmed.slice(0, idx).trim();
+      let val = trimmed.slice(idx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      process.env[key] = val;
+    }
+  }
+}
+
+const BASE_URL = process.env.BASE_URL || "https://line-checkin-worker.i14d142.workers.dev";
+const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || process.env.LINE_MESSAGING_CHANNEL_SECRET || "dummy_secret_for_tests";
 const STORE_ID = "24549210-01";
 
 async function runTest() {
@@ -76,7 +96,7 @@ async function runTest() {
           type: "user",
           userId: "U_MOCK_NEW_FRIEND_TEST"
         },
-        replyToken: "mock_test_follow_reply_token00",
+        replyToken: "mock_test_follow_reply_token",
         webhookEventId: `mock_evt_${Date.now()}`,
         deliveryContext: {
           isRedelivery: false

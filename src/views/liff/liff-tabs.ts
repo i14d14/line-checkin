@@ -25,15 +25,29 @@ export function renderLiffTabs(currentMonthStr: string): string {
 
         <!-- Store Target Card -->
         <div class="bg-gradient-to-br from-emerald-50/60 to-blue-50/60 p-4 rounded-2xl border border-emerald-100 text-left text-xs space-y-2.5">
-          <div class="flex items-start justify-between">
-            <div>
-              <span class="text-[10px] uppercase font-bold text-emerald-600 block mb-0.5">受邀加入據點</span>
-              <div id="onboardingCompanyName" class="font-bold text-sm text-gray-900">載入中...</div>
+          <div class="text-[10px] uppercase font-bold text-emerald-600">受邀加入據點</div>
+          
+          <!-- Row 1: Company Name & Tax ID -->
+          <div class="flex items-center justify-between gap-2 border-b border-emerald-100/60 pb-2">
+            <div class="flex items-center space-x-1.5 min-w-0">
+              <i class="fa-solid fa-building text-emerald-600 text-xs flex-shrink-0"></i>
+              <span id="onboardingCompanyName" class="font-bold text-sm text-gray-900 truncate">載入中...</span>
             </div>
-            <span id="onboardingCompanyBadge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800">-</span>
+            <span id="onboardingCompanyTaxId" class="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg bg-emerald-100/90 text-emerald-800 whitespace-nowrap flex-shrink-0">-</span>
           </div>
-          <div class="flex items-center text-gray-600 text-xs space-x-1.5 pt-1 border-t border-emerald-100/70">
-            <i class="fa-solid fa-location-dot text-emerald-600 text-xs"></i>
+
+          <!-- Row 2: Branch Name & Store Code -->
+          <div class="flex items-center justify-between gap-2 pt-0.5">
+            <div class="flex items-center space-x-1.5 min-w-0">
+              <i class="fa-solid fa-store text-blue-600 text-xs flex-shrink-0"></i>
+              <span id="onboardingBranchName" class="font-bold text-sm text-gray-900 truncate">據點門市</span>
+            </div>
+            <span id="onboardingBranchBadge" class="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg bg-blue-100/90 text-blue-800 whitespace-nowrap flex-shrink-0">-</span>
+          </div>
+
+          <!-- Row 3: Address -->
+          <div class="flex items-center text-gray-500 text-[11px] space-x-1.5 pt-1.5 border-t border-emerald-100/60">
+            <i class="fa-solid fa-location-dot text-emerald-500 text-xs flex-shrink-0"></i>
             <span id="onboardingCompanyAddress" class="truncate">門市地址載入中...</span>
           </div>
         </div>
@@ -54,14 +68,29 @@ export function renderLiffTabs(currentMonthStr: string): string {
           </div>
         </div>
 
-        <!-- Action Button -->
-        <!-- Action Button (Direct 1-Click Join) -->
+        <!-- Action Buttons: When not friend, show ONLY Add Friend. When friend, show ONLY Join Company! -->
         <div class="pt-2 space-y-2.5">
-          <button id="joinBtn" onclick="handleJoinCompany()" class="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-500/20 text-base transition flex items-center justify-center space-x-2">
-            <i class="fa-solid fa-circle-check text-lg"></i>
-            <span id="joinBtnText">確認加入公司考勤系統</span>
+          <!-- Add Friend CTA (Visible ONLY when !isFriendWithBot) -->
+          <a id="onboardingStep1Btn" href="https://line.me/R/ti/p/@375nvoga" target="_top" class="w-full bg-[#06C755] hover:bg-[#05b34c] active:scale-95 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition flex items-center justify-center space-x-2.5 text-center">
+            <i class="fa-brands fa-line text-2xl flex-shrink-0"></i>
+            <div class="flex flex-col items-center justify-center leading-tight">
+              <span class="text-sm font-bold tracking-wide whitespace-nowrap">加入打卡官方帳號好友</span>
+              <span class="text-[11px] font-normal opacity-90 mt-0.5 whitespace-nowrap">加入好友後於聊天室點選選單即可入職</span>
+            </div>
+          </a>
+
+          <!-- Confirm Join CTA (Visible ONLY when isFriendWithBot) -->
+          <button id="joinBtn" onclick="handleJoinCompany()" class="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition hidden items-center justify-center space-x-2.5 text-center cursor-pointer">
+            <i id="joinBtnIcon" class="fa-solid fa-circle-check text-xl flex-shrink-0 text-white"></i>
+            <div class="flex flex-col items-center justify-center leading-tight">
+              <span id="joinBtnTitle" class="text-sm font-bold tracking-wide whitespace-nowrap">確認加入考勤系統</span>
+              <span id="joinBtnSubText" class="text-[11px] font-medium opacity-90 mt-0.5 whitespace-nowrap">門市入職登記</span>
+            </div>
           </button>
-          <p class="text-[11px] text-gray-400">點擊確認即完成門市綁定，完成後將引導加入打卡官方帳號</p>
+
+          <p id="onboardingHintText" class="text-[11px] text-emerald-800 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 text-center leading-normal">
+            👉 點擊上方按鈕加入好友後，請直接在官方帳號聊天室下方點擊【新進同仁入職登記】即可完成入職！
+          </p>
         </div>
 
         <div id="onboardingAlert" class="p-3 rounded-xl text-xs hidden"></div>

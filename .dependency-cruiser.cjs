@@ -54,7 +54,7 @@ module.exports = {
       name: 'no-orphans',
       severity: 'warn',
       comment: '偵測未被引用的孤島模組 (死代碼)',
-      from: { orphan: true },
+      from: { orphan: true, pathNot: ['^src/index\\.ts$', '^src/client/'] },
       to: {}
     }
   ],

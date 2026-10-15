@@ -54,7 +54,8 @@ export class PayrollService {
         continue;
       }
 
-      const lineUserId = typeof raw.line_user_id === "string" ? raw.line_user_id.trim() : "";
+      const lineUserId = (typeof raw.line_user_id === "string" && raw.line_user_id.trim()) ||
+                         (typeof raw.employee_id === "string" && raw.employee_id.trim()) || "";
       const employeeName = typeof raw.employee_name === "string" ? raw.employee_name.trim() : "";
       const payMonth = typeof raw.pay_month === "string" ? raw.pay_month.trim() : "";
 

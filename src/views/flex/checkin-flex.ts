@@ -1,3 +1,6 @@
+import { assertValidFlexBubble, assertValidFlexMessage } from "../../utils/flex-validator";
+import { BubbleContainer, FlexMessage } from "../../schemas/line-flex.schema";
+
 export interface CheckinReceiptParams {
   accessToken: string;
   userId: string;
@@ -14,7 +17,7 @@ export interface CheckinReceiptParams {
   verifyMode?: "IP_WHITELIST" | "GPS_FALLBACK" | "GPS_ONLY";
 }
 
-export function buildCheckinReceiptBubble(params: Omit<CheckinReceiptParams, "accessToken" | "userId">): any {
+export function buildCheckinReceiptBubble(params: Omit<CheckinReceiptParams, "accessToken" | "userId">): BubbleContainer {
   const {
     userName,
     timeStr,
@@ -185,14 +188,10 @@ export function buildCheckinReceiptBubble(params: Omit<CheckinReceiptParams, "ac
     });
   }
 
-  return flexBubble;
+  return assertValidFlexBubble(flexBubble);
 }
 
-export interface CheckinFlexMessagePayload {
-  type: "flex";
-  altText: string;
-  contents: any;
-}
+export type CheckinFlexMessagePayload = FlexMessage;
 
 // Build standard LINE Flex Message object (ready for liff.sendMessages or push API)
 export function buildCheckinFlexMessage(
@@ -212,11 +211,11 @@ export function buildCheckinFlexMessage(
     ? "🔄 重複打卡提醒 (維持原紀錄)"
     : (isIn ? "🟢 上班打卡成功" : "🔴 下班打卡成功");
 
-  return {
+  return assertValidFlexMessage({
     type: "flex",
     altText: `${titleText}：${userName} - ${locationName} (${timeStr})`,
     contents: flexBubble,
-  };
+  });
 }
 
 // Push Check-in Receipt Flex Message to User (Legacy / Optional Push)

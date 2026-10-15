@@ -152,6 +152,18 @@ export async function handleCheckinRoutes(
     const punchType = url.searchParams.get("punchType");
     const format = (url.searchParams.get("format") || "json").toLowerCase();
     const limit = parseInt(url.searchParams.get("limit") || "100", 10);
+    const userId = url.searchParams.get("userId");
+
+    if (userId) {
+      const permCtx = await getUserPermissionContext(env, userId);
+      if (format === "csv" && !hasPermission(permCtx.permissions, "export_payroll")) {
+        return Response.json({ success: false, error: "權限不足：缺少 export_payroll 權限，無法匯出計薪報表" }, { status: 403, headers: corsHeaders });
+      }
+      const targetCompany = url.searchParams.get("companyId");
+      if (targetCompany && targetCompany !== permCtx.companyId && !hasPermission(permCtx.permissions, "view_all")) {
+        return Response.json({ success: false, error: "權限不足：缺少 view_all 權限，無法跨店查閱其他門市資料" }, { status: 403, headers: corsHeaders });
+      }
+    }
 
     try {
       const res = await service.getTenantRecords(

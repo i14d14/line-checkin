@@ -48,6 +48,12 @@
 - **`LINE_CHECKIN_PROGRESS.md` (Living Product Single Source of Truth - SSOT)**:
   - Serves as the authoritative source for current business specifications, the Persistent Verification Matrix (239+ passing tests), active API endpoints, D1 schemas, and production deployment parameters.
   - Architectural changes must never break documented business behaviors; all version iterations, database schema updates, or verified features must continuously reflect in this file.
+- **Architectural Knowledge Management (AKM) & ADR Decoupling Invariants**:
+  - **Strict SSOT vs. ADR Decoupling**: [`LINE_CHECKIN_PROGRESS.md`](file:///d:/line-checkin/LINE_CHECKIN_PROGRESS.md) is strictly reserved for the active operational state (Current State SSOT). Stacking or inlining architectural decision records (ADRs) directly into `LINE_CHECKIN_PROGRESS.md` is strictly forbidden to prevent the "Monolithic SSOT Bloat" anti-pattern.
+  - **Dedicated ADR Creation Standard**: All new architectural decisions must be written directly as standalone files under [`docs/adr/ADR-xxxx-<slug>.md`](file:///d:/line-checkin/docs/adr/) with standard metadata (Title, Status, Version, Domain Category, Decision Rationale, and Consequences).
+  - **Hot Routing Index Map**: Whenever creating a new ADR, immediately add a 1-line reference entry with its domain tags and file link into the Section 11 ADR Routing Map table in [`LINE_CHECKIN_PROGRESS.md`](file:///d:/line-checkin/LINE_CHECKIN_PROGRESS.md).
+- **Rule-Gated ADR Retrieval Protocol (Preventing Cold Storage Amnesia)**:
+  - Autonomous agents MUST NOT propose or modify code in foundational subsystems—including Attendance State Machine, SSOT Scheduling Roster, PBAC Permissions, D1 Persistence Schemas, LINE Flex Protocol, and Cron Reminders—without first consulting the ADR Routing Map in [`LINE_CHECKIN_PROGRESS.md`](file:///d:/line-checkin/LINE_CHECKIN_PROGRESS.md) and reading the relevant referenced ADRs in [`docs/adr/`](file:///d:/line-checkin/docs/adr/).
 
 ## Architectural Guardrails: Strict Unidirectional Call Chain
 - **Strict Downward Dependency Hierarchy**:
@@ -82,6 +88,9 @@
   - Test locations and entities must carry dedicated test identifiers (e.g., `-TEST-`, `-BPM-`, `-PBAC-`).
   - Tests must never leave mock or transient stores/locations in the shared D1 database upon completion or failure.
   - Test suites must cleanly delete test locations, user attributions, and generated records to preserve production database integrity.
+
+## AI Verification Discrepancy Register
+- **Bug Reporting Invariant**: Whenever the user reports any bug or discrepancy where previous AI verification passed, immediately log it into both [`AI_VERIFICATION_DISCREPANCIES.md`](file:///d:/line-checkin/AI_VERIFICATION_DISCREPANCIES.md) and [`LINE_CHECKIN_PROGRESS.md`](file:///d:/line-checkin/LINE_CHECKIN_PROGRESS.md#22--ai-檢測成功但用戶端檢測失敗清單-ai-verification-discrepancy-register) (Section 2.2).
 
 ## Headquarters Location Naming Rule
 - **Legal Naming Invariant for 56-11 Meide Street**: The official location name for the address "台中市北區美德街56-11號" must always be **`豬毛有限公司 - 台中美德總部`**. All database records, test suites, configuration files, seed data, and UI displays must strictly adhere to this exact legal entity name. Never use alternate naming (such as "換機測試旗艦店", "豬毛科技", or "豬毛餐飲").

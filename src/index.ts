@@ -107,6 +107,9 @@ export default {
   },
 
   async scheduled(event: any, env: Env, ctx: any): Promise<void> {
+    if (env.ENABLE_CHECKIN_REMINDERS === "false") {
+      return;
+    }
     const cronService = new CronService(env);
     if (ctx && typeof ctx.waitUntil === "function") {
       ctx.waitUntil(cronService.handleCronScheduled());

@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const envPath = path.resolve(__dirname, '../.env');
+const envPath = fs.existsSync(path.resolve(__dirname, '.env'))
+  ? path.resolve(__dirname, '.env')
+  : path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
   const lines = fs.readFileSync(envPath, 'utf8').split('\n');
   for (const line of lines) {

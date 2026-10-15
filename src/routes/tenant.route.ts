@@ -172,7 +172,7 @@ export async function handleTenantRoutes(
         lineUserId?: string;
         displayName?: string;
       };
-      const res = await service.joinEmployee(body);
+      const res = await service.joinEmployee(body, env.LINE_CHANNEL_ACCESS_TOKEN);
       return Response.json(res.body, { status: res.status, headers: corsHeaders });
     } catch (err: any) {
       return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });

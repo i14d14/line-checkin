@@ -35,15 +35,17 @@ export async function handleAnnouncementRoutes(
 
     try {
       const body = (await request.json()) as { title?: string; content?: string; authorName?: string };
-      if (!body.title || !body.content) {
+      const title = (body.title || "").trim();
+      const content = (body.content || "").trim();
+      if (!title || !content) {
         return Response.json({ success: false, error: "公告標題與內容皆為必填項目" }, { status: 400, headers: corsHeaders });
       }
 
       const service = new AnnouncementService(env);
       const result = await service.publishAnnouncement(auth.taxId!, {
-        title: body.title,
-        content: body.content,
-        authorName: body.authorName || auth.name || "公司人事行政部"
+        title,
+        content,
+        authorName: (body.authorName || "").trim() || auth.name || "公司人事行政部"
       });
 
       return Response.json(result, { status: 201, headers: corsHeaders });

@@ -1,3 +1,5 @@
+import { assertValidFlexBubble } from "../../utils/flex-validator";
+
 export interface AnnouncementFlexParams {
   id: string;
   title: string;
@@ -136,6 +138,8 @@ export function buildAnnouncementFlexBubble(
       ]
     }
   };
+
+  assertValidFlexBubble(flexBubble);
 
   return { flexBubble, altText };
 }

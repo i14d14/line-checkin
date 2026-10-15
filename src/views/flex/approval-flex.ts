@@ -1,4 +1,6 @@
 import { ApprovalType, ApprovalStatus } from "../../types";
+import { assertValidFlexBubble } from "../../utils/flex-validator";
+import { BubbleContainer } from "../../schemas/line-flex.schema";
 
 export function buildApprovalRequestFlex(
   approvalId: string,
@@ -107,7 +109,7 @@ export function buildApprovalRequestFlex(
     );
   }
 
-  return {
+  const result = {
     flexBubble: {
       type: "bubble",
       size: "mega",
@@ -193,6 +195,9 @@ export function buildApprovalRequestFlex(
     },
     altText: `【簽核通知】${applicantName} 提交了${currentConfig.label} (${targetDate})`
   };
+
+  assertValidFlexBubble(result.flexBubble);
+  return result;
 }
 
 export async function pushApprovalRequestFlex(
@@ -352,6 +357,8 @@ export function buildApprovalResultFlex(
   const altText = (!isApproved && rejectReason)
     ? `【審核結果】您的${typeText} (${targetDate})：已駁回（原因：${rejectReason}）`
     : `【審核結果】您的${typeText} (${targetDate})：${isApproved ? "已核准" : "已駁回"}`;
+
+  assertValidFlexBubble(flexBubble);
 
   return {
     flexBubble,

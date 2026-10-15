@@ -2,6 +2,7 @@ import { Env } from "../types";
 import { ApprovalRepository } from "../repositories/approval.repo";
 import { ApprovalService } from "../services/approval.service";
 import { authenticateTenantRequest, verifyLineIdToken } from "../services/auth.service";
+import { getUserPermissionContext, hasPermission } from "../services/tenant.service";
 
 export async function handleApprovalRoutes(
   request: Request,
@@ -150,6 +151,58 @@ export async function handleApprovalRoutes(
       return Response.json({
         success: true,
         message: `已成功為員工 [${targetLineUserId}] 綁定直屬審核主管 [${approverLineId}]`
+      }, { headers: corsHeaders });
+    } catch (err: any) {
+      return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });
+    }
+  }
+
+  // 5. POST /api/v1/approval/:id/decision -> Direct decision endpoint with PBAC enforcement
+  const decisionMatch = url.pathname.match(/^\/api\/v1\/approval\/([^/]+)\/decision$/);
+  if (decisionMatch && request.method === "POST") {
+    const approvalId = decisionMatch[1];
+    try {
+      const body = ((await request.json().catch(() => ({}))) || {}) as {
+        action?: "approve" | "reject";
+        userId?: string;
+        rejectReason?: string;
+      };
+
+      if (!body.action || !["approve", "reject"].includes(body.action)) {
+        return Response.json({ success: false, error: "缺少或無效之 action 參數 (應為 approve 或 reject)" }, { status: 400, headers: corsHeaders });
+      }
+
+      if (!body.userId) {
+        return Response.json({ success: false, error: "缺少操作者 userId 參數" }, { status: 400, headers: corsHeaders });
+      }
+
+      const permCtx = await getUserPermissionContext(env, body.userId);
+      if (!hasPermission(permCtx.permissions, "approve")) {
+        return Response.json({
+          success: false,
+          error: "權限不足：您尚未具備假勤審批 (approve) 權限"
+        }, { status: 403, headers: corsHeaders });
+      }
+
+      const clientIp = request.headers.get("cf-connecting-ip") || "127.0.0.1";
+      const userAgent = request.headers.get("user-agent") || "API";
+      const result = await approvalService.processDecision(
+        approvalId,
+        body.action,
+        body.userId,
+        clientIp,
+        userAgent,
+        body.rejectReason
+      );
+
+      if (!result.success) {
+        return Response.json({ success: false, error: result.replyMessage }, { status: 400, headers: corsHeaders });
+      }
+
+      return Response.json({
+        success: true,
+        isApprove: result.isApprove,
+        message: result.replyMessage
       }, { headers: corsHeaders });
     } catch (err: any) {
       return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });

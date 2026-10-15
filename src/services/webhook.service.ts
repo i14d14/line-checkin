@@ -339,6 +339,44 @@ export class WebhookService {
         return;
       }
 
+      // Cross-store attendance / global dashboard query
+      if (userMsg.includes("全局出勤") || userMsg.includes("跨店出勤") || userMsg.includes("全局看板") || userMsg.includes("跨店看板")) {
+        const permCtx = await getUserPermissionContext(this.env, userId);
+        if (!hasPermission(permCtx.permissions, "view_all")) {
+          if (replyToken) {
+            await replyLineMessage(
+              token,
+              replyToken,
+              "⛔ 【權限不足】\n您尚未開通「全局看板 (view_all)」權限，無法跨店查閱其他門市出勤紀錄。"
+            );
+          }
+          return;
+        }
+      }
+
+      // Payroll export query via LINE
+      if (userMsg.includes("計薪匯出") || userMsg.includes("匯出薪資") || userMsg.includes("匯出計薪") || userMsg.includes("匯出工時")) {
+        const permCtx = await getUserPermissionContext(this.env, userId);
+        if (!hasPermission(permCtx.permissions, "export_payroll")) {
+          if (replyToken) {
+            await replyLineMessage(
+              token,
+              replyToken,
+              "⛔ 【權限不足】\n您尚未開通「計薪匯出 (export_payroll)」權限，無法匯出計薪報表。"
+            );
+          }
+          return;
+        }
+        if (replyToken) {
+          await replyLineMessage(
+            token,
+            replyToken,
+            "📊 【計薪匯出完成】\n請登入管理後台或透過授權 API 下載本月份薪資報表 CSV。"
+          );
+        }
+        return;
+      }
+
       // Attendance dashboard for store / company
       if (userMsg.includes("今日出勤") || userMsg.includes("門市出勤") || userMsg.includes("出勤看板")) {
         const permCtx = await getUserPermissionContext(this.env, userId);

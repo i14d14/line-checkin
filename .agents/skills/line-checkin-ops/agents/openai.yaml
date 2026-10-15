@@ -1,0 +1,4 @@
+interface:
+  display_name: "LINE Check-in Operations"
+  short_description: "Runbooks and safe operational routines for LINE Check-in (zero-downtime Rich Menu migration, check-in revocation, and edge ops)."
+  default_model: "inherit"

@@ -15,6 +15,7 @@ export interface Env {
   LINE_LIFF_APP_ID?: string;
   ADMIN_MASTER_KEY?: string;
   ENABLE_CHECKIN_SERVER_PUSH?: string;
+  ENABLE_CHECKIN_REMINDERS?: string;
 }
 
 export interface CheckinPayload {
@@ -138,8 +139,9 @@ export const PERMISSION_LABELS: Record<string, string> = {
   broadcast: "公告推播"
 };
 
-export const EMPLOYEE_RICH_MENU_ID = "richmenu-120970060b421fd2a35634007795916f";
-export const MANAGER_RICH_MENU_ID = "richmenu-26e2f94f69a7e091962de3f22e6b6361";
+export const ONBOARDING_RICH_MENU_ID = "richmenu-a509b0ea03d35d105290c6fbfc8512f3";
+export const EMPLOYEE_RICH_MENU_ID = "richmenu-0310e7f4244e16f2588e213ca46fed5e";
+export const MANAGER_RICH_MENU_ID = "richmenu-37e110fb3f8093db1984d6fb85ddae04";
 
 export const MANAGEMENT_PERMISSIONS = [
   "view_store", "view_all", "approve", "set_location", "set_wifi", "device_audit", "export_payroll", "broadcast", "all", "admin"
@@ -261,6 +263,7 @@ export interface AnnouncementDetailResponse {
 }
 
 export interface PayslipItem {
+  employee_id?: string;
   line_user_id: string;
   employee_name: string;
   pay_month: string;

@@ -2,6 +2,7 @@ import { Env, ApprovalType, ApprovalStatus } from "../types";
 import { ApprovalRepository } from "../repositories/approval.repo";
 import { pushApprovalRequestFlex, pushApprovalResultFlex } from "../views/flex/approval-flex";
 import { auditDayAttendance } from "./schedule.service";
+import { getUserPermissionContext, hasPermission } from "./tenant.service";
 
 export interface SubmitApprovalParams {
   userId: string;
@@ -49,6 +50,15 @@ export class ApprovalService {
 
     if (!["LEAVE", "CORRECTION", "OVERTIME"].includes(type)) {
       return { success: false, error: "不支援的申請類型 (僅支援 LEAVE, CORRECTION, OVERTIME)", statusCode: 400 };
+    }
+
+    const permCtx = await getUserPermissionContext(this.env, userId);
+    if (!hasPermission(permCtx.permissions, "apply")) {
+      return {
+        success: false,
+        error: "權限不足：您尚未具備線上申請 (apply) 權限，無法發起簽核單據。",
+        statusCode: 403
+      };
     }
 
     const approverInfo = await this.repo.resolveEmployeeApproverInfo(userId, fallbackCompanyId, displayName);
@@ -182,6 +192,15 @@ export class ApprovalService {
         success: false,
         isApprove: false,
         replyMessage: "⚠️ 您不是本單據的指定審核人，無權進行此操作。"
+      };
+    }
+
+    const permCtx = await getUserPermissionContext(this.env, operatorUserId);
+    if (!hasPermission(permCtx.permissions, "approve")) {
+      return {
+        success: false,
+        isApprove: false,
+        replyMessage: "⚠️ 權限不足：您尚未具備假勤審批 (approve) 權限，無法核准或駁回單據。"
       };
     }
 

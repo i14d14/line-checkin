@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 2500px;
+    height: 1686px;
+    overflow: hidden;
+    background-color: #F8FAFC;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
+  }
+  .row-1 {
+    width: 2500px;
+    height: 843px;
+    display: flex;
+  }
+  .col {
+    height: 843px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+  }
+  .col-1 { width: 833px; padding-left: 32px; padding-right: 18px; }
+  .col-2 { width: 834px; padding-left: 18px; padding-right: 18px; }
+  .col-3 { width: 833px; padding-left: 18px; padding-right: 32px; }
+
+  .card {
+    width: 100%;
+    height: 100%;
+    border-radius: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    user-select: none;
+    background: #FFFFFF;
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07), 0 4px 12px rgba(0, 0, 0, 0.03);
+    border: 2px solid #E2E8F0;
+  }
+
+  .card .icon {
+    font-size: 155px;
+    line-height: 1;
+    margin-bottom: 24px;
+  }
+  .card .title {
+    font-size: 106px;
+    font-weight: 800;
+    color: #1E293B;
+    letter-spacing: 3px;
+    margin-bottom: 0;
+  }
+
+  /* Row 2: Wide Manager Workbench Card */
+  .row-2 {
+    width: 2500px;
+    height: 843px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 32px 32px 32px;
+  }
+  .card-manager {
+    background: #FFFFFF;
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07), 0 4px 12px rgba(0, 0, 0, 0.03);
+    border: 2px solid #E2E8F0;
+  }
+  .card-manager .icon {
+    font-size: 165px;
+    line-height: 1;
+    margin-bottom: 24px;
+  }
+  .card-manager .title {
+    font-size: 115px;
+    font-weight: 800;
+    color: #1E293B;
+    letter-spacing: 4px;
+    margin-bottom: 0;
+  }
+</style>
+</head>
+<body>
+  <!-- ROW 1 (3 個人考勤卡片，全白底，與員工選單一致) -->
+  <div class="row-1">
+    <div class="col col-1">
+      <div class="card">
+        <div class="icon">&#x23F1;&#xFE0F;</div>
+        <div class="title">考勤打卡</div>
+      </div>
+    </div>
+    <div class="col col-2">
+      <div class="card">
+        <div class="icon">&#x1F4C5;</div>
+        <div class="title">排班月曆</div>
+      </div>
+    </div>
+    <div class="col col-3">
+      <div class="card">
+        <div class="icon">&#x270D;&#xFE0F;</div>
+        <div class="title">線上簽核</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2 (門市管理工作台 全寬白底卡片) -->
+  <div class="row-2">
+    <div class="card card-manager">
+      <div class="icon">&#x1F3E2;</div>
+      <div class="title">門市管理工作台</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -5,6 +5,7 @@ import {
   ALL_PERMISSIONS,
   PERMISSION_LABELS,
   MANAGEMENT_PERMISSIONS,
+  ONBOARDING_RICH_MENU_ID,
   EMPLOYEE_RICH_MENU_ID,
   MANAGER_RICH_MENU_ID,
   PermissionCode
@@ -18,6 +19,7 @@ export {
   ALL_PERMISSIONS,
   PERMISSION_LABELS,
   MANAGEMENT_PERMISSIONS,
+  ONBOARDING_RICH_MENU_ID,
   EMPLOYEE_RICH_MENU_ID,
   MANAGER_RICH_MENU_ID,
   PermissionCode
@@ -38,13 +40,25 @@ export async function syncUserRichMenu(
         headers: { Authorization: `Bearer ${token}` }
       });
     } else {
-      await fetch(`https://api.line.me/v2/bot/user/${encodeURIComponent(userId)}/richmenu`, {
-        method: "DELETE",
+      await fetch(`https://api.line.me/v2/bot/user/${encodeURIComponent(userId)}/richmenu/${EMPLOYEE_RICH_MENU_ID}`, {
+        method: "POST",
         headers: { Authorization: `Bearer ${token}` }
       });
     }
   } catch (err) {
     console.error(`Failed to sync rich menu for ${userId}:`, err);
+  }
+}
+
+export async function unlinkUserRichMenu(token: string, userId: string): Promise<void> {
+  if (!token || !userId) return;
+  try {
+    await fetch(`https://api.line.me/v2/bot/user/${encodeURIComponent(userId)}/richmenu`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  } catch (err) {
+    console.error(`Failed to unlink rich menu for ${userId}:`, err);
   }
 }
 
@@ -286,6 +300,15 @@ export class TenantService {
       return { status: 400, body: { success: false, error: "缺少目標員工識別碼" } };
     }
 
+    if (body.companyId && body.companyId !== auth.taxId && !body.companyId.startsWith(`${auth.taxId}-`)) {
+      return { status: 403, body: { success: false, error: "權限不足：禁止跨租戶或跨統編修改員工權限" } };
+    }
+
+    const existingEmp = await this.repo.findEmployeeWithLocation(targetEmpIdOrUserId.trim());
+    if (existingEmp && existingEmp.company_id !== auth.taxId && !existingEmp.company_id.startsWith(`${auth.taxId}-`)) {
+      return { status: 403, body: { success: false, error: "權限不足：禁止跨租戶操作非本企業之員工" } };
+    }
+
     const permissions = Array.isArray(body.permissions) ? body.permissions : ["punch", "apply"];
     const effectiveCompanyId = body.companyId || auth.taxId!;
     const permStr = JSON.stringify(permissions);
@@ -364,6 +387,15 @@ export class TenantService {
       }
     }
 
+    // Self-healing reconciliation: Ensure LINE user's rich menu aligns with DB permissions
+    if (env.LINE_CHANNEL_ACCESS_TOKEN && userId.startsWith("U") && !userId.startsWith("U_MOCK") && !userId.startsWith("U_TEST")) {
+      try {
+        await syncUserRichMenu(env.LINE_CHANNEL_ACCESS_TOKEN, userId, permCtx.permissions, permCtx.isManager);
+      } catch (err) {
+        console.warn("Self-healing rich menu sync warning:", err);
+      }
+    }
+
     return {
       status: 200,
       body: {
@@ -383,11 +415,14 @@ export class TenantService {
     };
   }
 
-  async joinEmployee(body: {
-    companyId?: string;
-    lineUserId?: string;
-    displayName?: string;
-  }): Promise<{ status: number; body: any }> {
+  async joinEmployee(
+    body: {
+      companyId?: string;
+      lineUserId?: string;
+      displayName?: string;
+    },
+    lineToken?: string
+  ): Promise<{ status: number; body: any }> {
     const companyId = body.companyId?.trim();
     const lineUserId = body.lineUserId?.trim();
     const displayName = body.displayName?.trim() || "新進同仁";
@@ -401,8 +436,34 @@ export class TenantService {
       return { status: 404, body: { success: false, error: `找不到此門市代碼 [${companyId}]` } };
     }
 
+    // Strict Friendship Hard Gate: Verify with LINE API if token is provided & it is a real user ID
+    if (lineToken && lineUserId.startsWith("U") && !lineUserId.startsWith("U_MOCK") && !lineUserId.startsWith("U_TEST") && !lineUserId.includes("TEST")) {
+      try {
+        const friendCheckUrl = `https://api.line.me/v2/bot/profile/${encodeURIComponent(lineUserId)}`;
+        const friendRes = await fetch(friendCheckUrl, {
+          headers: { Authorization: `Bearer ${lineToken}` }
+        });
+        if (!friendRes.ok) {
+          return {
+            status: 403,
+            body: {
+              success: false,
+              error: "未偵測到打卡官方帳號好友關係，請先加入打卡機器人為好友方可完成入職！"
+            }
+          };
+        }
+      } catch (err) {
+        console.warn("Friendship check network warning:", err);
+      }
+    }
+
     await this.repo.joinEmployee(companyId, lineUserId, displayName);
     await this.repo.logAudit(lineUserId, displayName, "INITIAL_JOIN", companyId);
+
+    // Sync employee rich menu upon successful enrollment
+    if (lineToken) {
+      await syncUserRichMenu(lineToken, lineUserId, ["punch", "apply"], false);
+    }
 
     return {
       status: 200,

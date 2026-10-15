@@ -19,7 +19,9 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const envPath = path.resolve(__dirname, '../.env');
+const envPath = fs.existsSync(path.resolve(__dirname, '.env'))
+  ? path.resolve(__dirname, '.env')
+  : path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
   const lines = fs.readFileSync(envPath, 'utf8').split('\n');
   for (const line of lines) {
@@ -187,6 +189,17 @@ async function runTests() {
   });
   const bindData = await authBind.json();
   assert("授權指派直屬主管 200 OK", authBind.status === 200 && bindData.success === true);
+
+  // Grant approve permission to TEST_MGR_DIRECT so PBAC allows decision making
+  await fetch(`${WORKER_URL}/api/v1/tenant/employees/${TEST_MGR_DIRECT}/permissions`, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({
+      companyId: TEST_LOC_ID,
+      employeeName: "直屬主管",
+      permissions: ["punch", "apply", "approve"]
+    })
+  });
 
   // Bind Emp 2 to the location via checkin or fallbackCompanyId
   // 5. Submit Leave Request -> Route to Direct Approver

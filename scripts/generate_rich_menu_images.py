@@ -96,6 +96,24 @@ def create_manager_menu():
     print(f"Generated Manager Menu Image (2500x1686): {out_path} ({os.path.getsize(out_path)} bytes)")
     return out_path
 
+def create_onboarding_menu():
+    img = Image.new("RGB", (WIDTH, HEIGHT), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    title_font = get_font(title_size=130)
+
+    cy = HEIGHT // 2
+
+    # --- 全版單一滿版按鈕: 新進同仁入職登記 (LINE Green 底，純白字大字級 CTA) ---
+    draw.rectangle([0, 0, WIDTH, HEIGHT], fill=(6, 199, 85))          # #06C755
+    draw.rectangle([0, 0, WIDTH, 20], fill=(4, 150, 65))               # Deeper emerald accent
+    draw.text((WIDTH // 2, cy), "新進同仁入職登記", anchor="mm", font=title_font, fill=(255, 255, 255))
+
+    out_path = os.path.join(os.path.dirname(__file__), "richmenu_onboarding.png")
+    img.save(out_path, format="PNG", optimize=True)
+    print(f"Generated Onboarding Menu Image (2500x843): {out_path} ({os.path.getsize(out_path)} bytes)")
+    return out_path
+
 if __name__ == "__main__":
     create_employee_menu()
     create_manager_menu()
+    create_onboarding_menu()

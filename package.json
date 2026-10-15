@@ -1,26 +1,46 @@
 {
   "name": "line-checkin-worker",
-  "version": "2.20.4",
+  "version": "2.31.4",
   "description": "LINE GPS Attendance & Check-in System on Cloudflare Workers & D1",
   "main": "src/index.ts",
   "scripts": {
+    "render:menus": "node scripts/render_rich_menus.js",
+    "setup:menus": "node scripts/setup_all_rich_menus.js",
+    "build:client": "esbuild src/client/liff/index.ts --bundle --format=iife --outfile=src/views/liff/liff.client.js",
+    "client:typecheck": "tsc -p tsconfig.client.json --noEmit",
+    "client:check": "npm run client:typecheck && node --check src/views/admin/admin.client.js && node --check src/views/liff/liff.client.js",
+    "predev": "npm run build:client",
     "dev": "node run-wrangler.js dev",
+    "predeploy": "npm run build:client",
     "deploy": "node run-wrangler.js deploy",
     "revoke": "node scripts/revoke-checkin.js",
-    "client:check": "node --check src/views/admin/admin.client.js",
     "typecheck": "tsc --noEmit",
     "arch:check": "depcruise src",
     "arch:metrics": "depcruise --metrics --output-type metrics src",
     "arch:graph": "depcruise --output-type mermaid src",
-    "check": "npm run client:check && npm run typecheck && npm run arch:check",
-    "test": "node test_bpm_approvals.js && node test_company_announcements.js && node test_payslip_distribution.js && node test_roster_ssot_and_unscheduled.js",
+    "check": "npm run build:client && npm run client:check && npm run typecheck && npm run arch:check",
+    "test:flex": "esbuild test_flex_schemas.ts --bundle --platform=node --outfile=test_flex_schemas.js && node test_flex_schemas.js",
+    "test": "npm run test:flex && node test_bpm_approvals.js && node test_company_announcements.js && node test_payslip_distribution.js && node test_roster_ssot_and_unscheduled.js && npm run test:batch4 && npm run test:batch5 && npm run test:batch6 && npm run test:batch7",
     "test:roster": "node test_roster_ssot_and_unscheduled.js",
     "test:announcements": "node test_company_announcements.js",
-    "test:payslips": "node test_payslip_distribution.js"
+    "test:payslips": "node test_payslip_distribution.js",
+    "test:batch1": "node test_batch1_verification.js",
+    "test:batch2": "node test_batch2_verification.js",
+    "test:batch3": "node test_batch3_verification.js",
+    "test:batch4": "node test_batch4_verification.js",
+    "test:batch5": "node test_batch5_verification.js",
+    "test:batch6": "node test_batch6_verification.js",
+    "test:batch7": "node test_batch7_verification.js"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250224.0",
+    "@types/jsdom": "^30.0.0",
     "dependency-cruiser": "^18.2.0",
+    "esbuild": "^0.28.2",
+    "jsdom": "^29.1.1",
     "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
   }
 }

@@ -1,3 +1,5 @@
+import { assertValidFlexBubble } from "../../utils/flex-validator";
+
 export interface ReminderParams {
   userName: string;
   shiftTime: string;
@@ -114,6 +116,8 @@ export function buildReminderFlexBubble(type: "IN" | "OUT", params: ReminderPara
       ],
     },
   };
+
+  assertValidFlexBubble(flexBubble);
 
   return { flexBubble, altText };
 }

@@ -1,0 +1,19 @@
+{
+  "entries": [
+    {
+      "path": "C:/Users/pigmao/optional_skills",
+      "include_only": [
+        "cloudflare",
+        "dependency-cruiser",
+        "javascript-typescript",
+        "line-cloud-manager",
+        "software-architecture",
+        "software-testing",
+        "sql"
+      ]
+    },
+    {
+      "path": ".agents/skills/line-checkin-ops"
+    }
+  ]
+}

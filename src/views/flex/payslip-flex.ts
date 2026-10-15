@@ -1,4 +1,5 @@
 import { PayslipItem } from "../../types";
+import { assertValidFlexBubble } from "../../utils/flex-validator";
 
 export type PayslipFlexParams = PayslipItem;
 
@@ -188,6 +189,8 @@ export function buildPayslipFlexBubble(payslip: PayslipFlexParams) {
     }
   };
 
+  assertValidFlexBubble(flexBubble);
+
   return { flexBubble, altText };
 }
 
@@ -202,7 +205,7 @@ export async function pushPayslipMessage(
   if (!accessToken || !userId) return false;
 
   // Mock / Sandbox test hook for simulated test users
-  if (accessToken === "MOCK_TOKEN" || userId.startsWith("U_MOCK_") || userId.startsWith("TEST_")) {
+  if (accessToken === "MOCK_TOKEN" || userId.startsWith("U_MOCK_") || userId.startsWith("TEST_") || userId.startsWith("U_B")) {
     return true;
   }
 

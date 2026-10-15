@@ -78,7 +78,7 @@ export async function handleScheduleRoutes(
     }
 
     try {
-      const body = (await request.json()) as { schedules: Array<any> };
+      const body = ((await request.json().catch(() => ({}))) || {}) as { schedules: Array<any> };
       if (!body.schedules || !Array.isArray(body.schedules) || body.schedules.length === 0) {
         return Response.json({ success: false, error: "缺少 schedules 陣列資料" }, { status: 400, headers: corsHeaders });
       }
@@ -88,6 +88,7 @@ export async function handleScheduleRoutes(
         success: true,
         message: result.message,
         insertedCount: result.insertedCount,
+        importedCount: result.insertedCount,
       }, { headers: corsHeaders });
     } catch (err: any) {
       return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });

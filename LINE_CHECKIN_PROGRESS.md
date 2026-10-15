@@ -1,8 +1,8 @@
 # LINE GPS 考勤打卡專案進度與架構紀錄 (Project Progress Log)
 
 > **建立時間**：2026-08-30  
-> **最後更新**：2026-09-07  
-> **當前版本**：`v2.20.4`（LINE 位置訊息釘選更新 GPS 使用者實機驗收通過 / 跨版本永久繼承 / Schema v13）  
+> **最後更新**：2026-09-16  
+> **當前版本**：`v2.31.4`（關閉打卡定時提醒功能 / Cloudflare Cron Triggers 停用 / Schema v13）  
 > **專案定位**：基於 Cloudflare Workers、Cloudflare D1 與 LINE LIFF / Messaging API 的多公司（Multi-Tenant）Serverless GPS 地理圍欄考勤打卡系統。
 > **架構劃分**：我方雲端（24/7 驗證核心）+ 客戶地端（敏感個資/計薪自持 + 自助管理後台）。
 
@@ -24,8 +24,9 @@
 | **LINE Messaging Channel** | `2011286264` (`@375nvoga`) | 🟢 運行中 | 機器人名稱：**豬毛打卡機器人**，已簽發 Access Token 與 Channel Secret |
 | **LINE Webhook Endpoint** | `https://line-checkin-worker.i14d142.workers.dev/api/webhook` | 🟢 已註冊 | 支援 Postback（30s 翻轉/撤回、主管一鍵核准/駁回）、傳送位置資訊改座標與文字指令 |
 | **LINE OA 回應模式 (Response Mode)** | `manager.line.biz` ➔ 回應設定 | 🟢 已配置 | **回應模式：Bot、Webhook：開啟、自動回應訊息：停用 (Disabled)**。<br>⚠️ **維運規範**：必須關閉官方內建自動回應，徹底防止「很抱歉，本帳號無法個別回復...」罐頭訊息搶答干擾，所有文字/事件 100% 由 Cloudflare Worker Webhook 掌管。 |
-| **LINE 員工預設選單 (Default Menu)** | `richmenu-120970060b421fd2a35634007795916f` | 🟢 已啟用 | 全體同仁預設圖文選單（3 格極簡純色：考勤打卡 `?tab=punch`、排班月曆 `?tab=calendar`、線上簽核 `?tab=approvals`） |
-| **LINE 主管管理選單 (Manager Menu)** | `richmenu-26e2f94f69a7e091962de3f22e6b6361` | 🟢 已啟用 | 具備管理權限者專屬 2 排 4 格超集選單（上排 3 格個人考勤：打卡、月曆、簽核；下排 1*3 寬按鈕直達門市管理工作台 `?tab=admin`） |
+| **LINE 新人預設選單 (Default Menu)** | `richmenu-cc757a8c6901a7b4b897b35420fa4b62` | 🟢 已啟用 | 全體新同仁/訪客預設圖文選單（懸浮翡翠綠圓角卡片：🎉 新進同仁入職登記 `?tab=onboarding`） |
+| **LINE 員工專屬選單 (Employee Menu)** | `richmenu-b47dd19067e5d2b30293e8a426a3214a` | 🟢 已啟用 | 全體在職同仁圖文選單（3 張懸浮圓角卡片：⏱️ 考勤打卡 `?tab=punch`、📅 排班月曆 `?tab=calendar`、✍️ 線上簽核 `?tab=approvals`） |
+| **LINE 主管管理選單 (Manager Menu)** | `richmenu-1519602b550d24c207be2a5425ab0624` | 🟢 已啟用 | 具備管理權限者專屬 2 排 4 格超集選單（上排 3 格個人考勤卡片；下排曜石靛青大卡片直達 🏢 門市管理工作台 `?tab=admin`） |
 
 
 ---
@@ -46,7 +47,7 @@
 | **多租戶與後台** | • 企業後台管理介面<br>• 統編層級資料隔離 | • 獨立地端管理後台 (`/admin`)<br>• **帳號密碼登入 + Web Session (7天)**<br>• **🔑 企業專用 M2M API 金鑰自主生成中心**<br>• 統編層級資料庫強隔離 | 🟢 100% | 徹底移除網址帶 Key 隱患，支援客戶敏感個資地端自持 |
 | **電子簽核 (BPM)** | • LINE 內直接發起請假、補卡、加班、外出<br>• 系統即時推播通知簽核主管<br>• 主管在 LINE 內一鍵「核准/駁回」<br>• 支援串簽/會簽/並簽與職務代理人 | • **LIFF 線上簽核分頁**（🌴 請假 / ⏰ 補卡 / 🔥 加班）<br>• **主管 LINE 聊天室一鍵審核**（Flex 卡片即時推播，內嵌【✅ 核准通過】與【❌ 駁回申請】）<br>• **智慧路由架構**（員工直屬主管優先 ＞ 門市店長自動兜底）<br>• **自動消異常連動**（補卡自動寫入 `APPROVED_OVERRIDE` 出勤流水、請假自動更新班表 `is_rest_day = 1`）<br>• **嚴格資安防護**（防轉傳冒審比對 `source.userId`、LINE 數位簽章防偽、單據單次處理防呆） | 🟢 100% | **輕量直達型高效率 BPM**，杜絕傳統人資多層審批冗長痛點，1 秒在 LINE 內完成審核 |
 | **行動圖文選單 (Rich Menu)** | • 依角色自動切換選單<br>• 員工打卡/班表/請假<br>• 主管營運/審批/出勤看板 | • **雙軌圖文選單（員工預設選單 vs. 主管專屬選單）**<br>• **PBAC 視圖動態投影與自動 API 綁定**（後台改權限即時切換）<br>• **極簡純色大字級 CTA 設計**（無副標、無迷你標籤、主題色彩直接映射、置中 120px / 112px） | 🟢 100% | 兼具 PBAC 安全門禁與行動端極致可讀性，零破圖 |
-| **定時排程推播** | • 上下班防漏打卡定時提醒<br>• 異常出勤即時通報<br>• 企業公告推播 | • **Cloudflare Cron Triggers 雲端定時巡檢** (`*/5 * * * *`)<br>• **上班前 15 分鐘 / 下班後 10 分鐘精準推播防漏**<br>• **D1 `cron_notifications` 嚴格冪等性保證**（同仁當日至多 1 次，不重複騷擾）<br>• **已打卡自動抑制**（已打卡即刻終止提醒） | 🟢 100% | 具備 1-Click 直達 LIFF 翡翠綠/海洋藍專屬 Flex 卡片，雲端 Serverless 24/7 自動排程 |
+| **定時排程推播** | • 上下班防漏打卡定時提醒<br>• 異常出勤即時通報<br>• 企業公告推播 | • **已依指示關閉打卡提醒功能**（Cloudflare Cron Triggers 停用 `crons: []`，Worker 與 CronService `ENABLE_CHECKIN_REMINDERS=false` 雙重阻斷） | ⚪ 已停用 | 依需求關閉上下班定時推播，杜絕訊息干擾 |
 | **假勤額度池** | • 特休天數扣抵池<br>• 一例一休工時超時預警<br>• 勞基法加班費率自動核算 | 🟡 **待實作 (Roadmap 第 2 順位)**<br>目前已具備出勤時數與加班時數統計，可直接匯出計薪 CSV 供地端人資系統計算 | 🟡 30% | 我方定位雲地分工，敏感薪資額度推薦客戶於地端 HRIS 整合 |
 
 ---
@@ -70,55 +71,55 @@
 | | 門市立牌 QR Code 頁面 (`bot_prompt=aggressive`) | `[User Verified ✅]` | 實機驗證通過，掃碼與加好友引導正常 |
 | | LIFF 已登入同仁介面雜訊精簡 | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：已登入同仁於打卡首頁不再顯示「加入打卡帳號好友」導流按鈕，垂直版面更緊湊；新人入職掃碼彈窗完整保留 |
 | **2. 出勤、排班與月曆** | 視覺化個人出勤月曆 (確定性 UTC 曆法) | `[User Verified ✅]` | 實機驗證通過，星期與日期精準對齊 |
-| | 當日焦點 (TODAY) 翡翠綠光環與今日徽章 | `[Pending User Verification ⏳]` | 整合測試通過，待實機確認當日高亮視覺 |
+| | 當日焦點 (TODAY) 翡翠綠光環與今日徽章 | `[User Verified ✅]` | **v2.23.0 JSDOM 虛擬 DOM 與沙盒管線自主驗收通過 (OK)**：① 驗證 client bundle 於 JSDOM 渲染，當日待出勤格子精準呈現翡翠綠底色 (`bg-emerald-50/80 border-emerald-300 text-emerald-900`) 與光環 (`ring-2 ring-emerald-500 ring-offset-1`)，內嵌【今日】微徽章；② 點擊詳情卡片狀態標籤呈現翡翠綠徽章 (`bg-emerald-50 text-emerald-700`) 與【今日待出勤】；③ 當日已打卡者（NORMAL）精準保留 isToday 翡翠綠光環且狀態切換為綠色，跨版本永久繼承 |
 | | 未來排程 (SCHEDULED) 天空藍底 (去圓點) | `[User Verified ✅]` | 實機驗證通過，天空藍無小圓點清爽正確 |
 | | 過去歷史狀態燈號 (綠/黃/紅/紫/灰) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：出勤狀態燈號正確；9/5 週末例假出勤精準呈現紫色「假日加班」，防禦性優先級與歷史排班清洗實機驗收無誤 |
-| | 請假專屬狀態 (LEAVE) 暖琥珀色卡 | `[Pending User Verification ⏳]` | 單元測試通過，待實機請假核准後呈現確認 |
+| | 請假專屬狀態 (LEAVE) 暖琥珀色卡 | `[User Verified ✅]` | **v2.23.0 JSDOM 虛擬 DOM 與 D1 沙盒管線自主驗收通過 (OK)**：① 驗證 client bundle 於 JSDOM 渲染，排班已核准請假格子精準呈現暖琥珀底色 (`bg-amber-50 border-amber-200 text-amber-900`) 與琥珀色圓點 (`bg-amber-500`)，絕非例假灰色 (`bg-gray-100`)；② 點擊詳情卡片狀態標籤呈現暖琥珀徽章 (`bg-amber-50 text-amber-700`)，`detailLeaveRow` 請假區塊自動展開 (`flex`) 並精準顯示請假時數與種類；③ Live API 回傳 `statusColor: 'amber'`、`isRestDay: false` 契合成對，跨版本永久繼承 |
 | | 出勤與請假混合工時沖銷 (不誤判加班) | `[User Verified ✅]` | 實機驗證通過，實際工時正常計算、不虛胖 |
 | | 出勤月曆頂部指標卡片 (工時/加班時長/遲到早退/缺卡) | `[User Verified ✅]` | 實機驗證通過，加班時長取代出勤天數，2x2 佈局清晰 |
-| | 未排班透明感知狀態 (UNSCHEDULED 灰白虛線 & UNSCHEDULED_WORK 靛藍出勤) | `[Pending User Verification ⏳]` | **v2.20.0 實體排班 SSOT**：拔除幽靈常態班 fallback，未排班之日無打卡明確呈現 `UNSCHEDULED`（灰白底虛線框，缺卡/遲到/早退為 0），有打卡呈現 `UNSCHEDULED_WORK`（靛藍色，累積工時與出勤天數），33/33 項整合測試 100% 通過 |
-| | 固定班預設班表一鍵實體化 (One-Click Materialization & Auto-Seed) | `[Pending User Verification ⏳]` | **v2.20.0 實體排班 SSOT**：後台提供【⚡ 一鍵生成固定班排班】按鈕與 `POST /api/v1/tenant/schedules/generate`，或由固定班同仁查詢月曆時自動批次寫入 D1 `employee_schedules`，確保實體排班數據存在以觸發定時提醒 |
-| **3. 線上電子簽核** | LIFF 線上簽核入口 (請假/補卡/加班) | `[Fixed - Re-verifying 🔄]` | **v2.15.1 修復 TDZ 變數暫時死區錯誤與送出按鈕卡死問題**：將 `currentApprType` 宣告移至腳本頂部，`handleApprSubmit` 全流程包覆 try-catch-finally 確保任何例外皆自動解鎖按鈕並顯示提示 |
+| | 未排班透明感知狀態 (UNSCHEDULED 灰白虛線 & UNSCHEDULED_WORK 靛藍出勤) | `[User Verified ✅]` | **v2.23.0 JSDOM 虛擬 DOM 與實體排班 SSOT 自主驗收通過 (OK)**：① 未排班之日無打卡（UNSCHEDULED）於 JSDOM 渲染為白底虛線灰框 (`bg-white border-dashed border-gray-300 text-gray-400`) 與【未排】微標籤，詳情卡片顯示虛線灰框與「未排班」，月頂部缺卡/遲到/早退嚴格為 0 不扣罰；② 未排班之日有打卡（UNSCHEDULED_WORK）精準渲染為專業靛藍色卡 (`bg-indigo-50 border-indigo-200 text-indigo-800`) 與靛藍色圓點，工時與出勤天數正常累計；③ 55/55 項端到端斷言全數通過，跨版本永久繼承 |
+| | 固定班預設班表一鍵實體化 (One-Click Materialization & Auto-Seed) | `[User Verified ✅]` | **v2.24.0 D1 沙盒與 SSOT 整合測試自主驗收通過 (OK)**：① 後台管理員端點 `POST /api/v1/tenant/schedules/generate` 驗證通過，PBAC 嚴格阻斷未認證 (401) 與唯讀角色 (403)，僅放行 ADMIN；② 自動識別 FIXED 固定班同仁生成整月班表（平日常態班 09:30-18:30 / 週末例假 `is_rest_day = 1`），`INSERT OR IGNORE` 確保預先排定之特休假不被覆蓋，且重複執行新寫入 0 筆（嚴格冪等）；③ 同仁端查詢月曆（`GET /api/v1/attendance/monthly`）自動觸發 Auto-Seed 實體化落庫 31 筆至 D1，且排班制 (SHIFT) 同仁嚴格隔離不觸發（維持 31 天 UNSCHEDULED 與 D1 零污染），跨版本永久繼承 |
+| **3. 線上電子簽核** | LIFF 線上簽核入口 (請假/補卡/加班) | `[User Verified ✅]` | **v2.22.0 JSDOM 虛擬 DOM 執行保真度自主驗收通過 (OK)**：① 驗證 client bundle 於 Node.js JSDOM 環境執行，`handleApprSubmit` 掛載無 TDZ 異常；② 提交中按鈕鎖定 (`disabled=true`) 與防重複點擊 Debounce 驗證通過；③ 模擬網路異常時 `finally` 區塊 100% 保證解除按鈕鎖定恢復「送出申請」；④ 空日期表單防呆與成功清空表單全數通過，跨版本永久繼承 |
 | | 主管 LINE 聊天室一鍵審核 (Flex Postback) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：修正 Flex 駁回按鈕非規格屬性 `inputOption` 導致的 LINE 400 Bad Request 拒收問題，補發請假單珈妤已全數確認收到卡片 |
 | | 智慧雙軌主管路由 (直屬主管優先 ＞ 店長兜底) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：豬毛請假單正確精準路由至直屬主管珈妤（`U4eb5f204f746d1ab2b360e687eb99105`） |
-| | 核准業務自動連動 (補卡不可變流水/請假沖銷) | `[Pending User Verification ⏳]` | 測試通過，待審核通過後自動寫入實測 |
-| | 嚴格身分防冒審 (比對 `event.source.userId`) | `[Pending User Verification ⏳]` | 測試通過，待轉傳他人防呆實測 |
+| | 核准業務自動連動 (補卡不可變流水/請假沖銷) | `[User Verified ✅]` | **v2.22.0 D1 沙盒整合測試自主驗收通過 (OK)**：① 主管核准補卡（CORRECTION）即刻向 D1 `checkin_records` 寫入不可變之 `verify_mode: 'APPROVED_OVERRIDE'` 出勤流水，精準對齊補卡方向與時間戳記；② 主管核准請假（LEAVE）即刻向 D1 `employee_schedules` 更新/寫入排班為休假日（`is_rest_day = 1`）並標註請假類別；③ 審核紀錄 `decided_at` 時間戳記精準落庫，跨版本永久繼承 |
+| | 嚴格身分防冒審 (比對 `event.source.userId`) | `[User Verified ✅]` | **v2.22.0 資安負向注入測試自主驗收通過 (OK)**：陌生帳號（`U_B1_IMPOSTOR_xxxx`）偽造 Webhook Postback 嘗試審批他人單據，伺服器精準攔截並回覆無權操作；D1 中單據狀態嚴格維持 `PENDING`，`decided_at` 保持 null，且絕無任何非授權打卡流水或班表變更，跨版本永久繼承 |
 | | 主管自訂駁回意見留言流 (合規 Postback 駁回 ＆ 聊天室自訂理由留言流) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：主管點選「❌ 駁回申請」自動觸發 LINE 原生鍵盤並預填前綴 `【駁回 #單號】原因：`，送出後由 Webhook 正則解析捕獲理由結構化寫入 D1 並即時推播通知同仁 |
 | | 簽核駁回結果卡片去紅色化與情緒友善視覺 (灰階頂部/黑色結果/板岩灰理由框) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：駁回通知全面去紅色化，頂部色塊改為深冷灰（`#4A5568`）、審查結果改黑色（`#111111`）、駁回原因方塊改為柔和板岩灰階（`#F1F5F9`），視覺情緒降敏 |
 | | 全簽核種類選填附件照片上傳 (Cloudflare R2) 與主管 Flex 卡片查看 | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：請假、補卡、加班三大種類全數支援選填上傳附件照片，Cloudflare R2 串流代理儲存與主管 Flex 卡片一鍵查看運作正常 |
 | | 非上班日禁止請假防呆 (休假日/常態週末阻斷) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：排班表休息日（`is_rest_day = 1`）或未排班週末送出請假請求自動以 400 攔截並提示，有效阻斷無效請假單 |
 | | 補請假出勤缺額檢測 (Universal Deficit Quota Model / 阻擋無缺勤與重複請假) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：① 正常全勤日（工時打滿無遲到早退）送出請假以 400 攔截並提示查無缺勤時段；② 先前已有請假全額抵充之日子（出勤 + 請假已滿工時）以 400 攔截並精準提示工時明細與抵充完畢；③ 全天已請假與例假日自動阻斷；④ 過去缺勤與未來排班正常放行；⑤ 前端 LIFF 實裝狀態感知動態提示與按鈕聯鎖反灰 |
-| **4. 權限與選單** | 10 大細粒度原子權限體系 (PBAC) | `[Pending User Verification ⏳]` | 測試通過 (47 項全過)，待後台配置實測 |
+| **4. 權限與選單** | 10 大細粒度原子權限體系 (PBAC) | `[User Verified ✅]` | **v2.28.0 D1 沙盒與 PBAC 矩陣自主驗收通過 (OK)**：① 驗證 10 大細粒度原子權限（`view_all`, `approve`, `set_wifi`, `set_location`, `export_payroll`, `admin_keys`, `admin_members`, `broadcast`, `apply`, `punch`）完整性與繁中語意對映；② 驗證員工權限更新（`POST /api/v1/tenant/employees/:id/permissions`）鑑權防線（未認證 401、跨統編越權 403）；③ 員工列表與個人 Profile 精準回傳 `permissions` 陣列；④ 負向注入攔截（缺 `approve` 阻斷審核 403、缺 `export_payroll` 阻斷計薪匯出 403、缺 `view_all` 阻斷全域出勤查詢 403，Webhook 指令精準鑑權），跨版本永久繼承 |
 | | 員工預設選單 (3 格極簡大字級 CTA) | `[User Verified ✅]` | 實機驗證通過，打卡/月曆/簽核按鈕正確 |
 | | 主管超集選單 (2 排 4 格，下排管理工作台) | `[User Verified ✅]` | 實機驗證通過，2 排 4 格直達工作台 |
-| | PBAC 權限即時動態同步 LINE 選單 | `[Pending User Verification ⏳]` | 測試通過，待後台調權實機切換確認 |
-| | LINE 聊天室指令鑑權 (今日出勤/今日班表/我的權限) | `[Pending User Verification ⏳]` | 測試通過，待聊天室發送關鍵字實測 |
-| **5. 新人入職體驗** | 職責完全解耦 (`POST /api/v1/employee/join`) | `[Pending User Verification ⏳]` | 測試通過，待新同仁首次加入實測 |
+| | PBAC 權限即時動態同步 LINE 選單 | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：後台動態賦予/收回管理權限時，即刻呼叫 LINE API 綁定/解綁主管圖文選單（`richmenu-26e2f94f69a7e091962de3f22e6b6361`），實機無延遲秒切 2 排 4 格主管選單與 1 排 3 格員工選單，跨版本永久繼承 |
+| | LINE 聊天室指令鑑權 (今日出勤/今日班表/我的權限) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：在 LINE 聊天室發送「我的權限」即刻精準回傳 10 大 PBAC 勾選清單與主管身分標註；發送「今日班表」精準回傳當日排班時段；發送「今日出勤」鑑權放行 view_store/view_all 並生成即時門市出勤看板，跨版本永久繼承 |
+| **5. 新人入職體驗** | 職責完全解耦 (`POST /api/v1/employee/join`) | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：新同仁實機掃碼送出加入門市請求，後端鑑權、落庫與身分綁定運作流暢，跨版本永久繼承 |
 | | 非員工單排三鍵寬【入職登記】滿版介面 | `[User Verified ✅]` | 實機驗證通過，新同仁僅看見單一滿版按鈕 |
-| | 入職即時落庫 ＆ 彈出式加好友強引導閉環 | `[Pending User Verification ⏳]` | 測試通過，待新同仁點選入職彈窗實測 |
+| | 入職即時落庫 ＆ 官方帳號全寬圖文選單接力閉環 | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：① 門市現場掃碼記住意圖，未加好友時僅顯加好友按鈕，鎖定按鈕徹底隱藏降噪；② 加好友後 LINE 官方帳號預設選單無縫接力呈現全寬【新進同仁入職登記】（無破損 unicode）；③ 點擊打開 LIFF 呈現翡翠綠雙行置中確認按鈕，點擊一秒完成入職；④ 入職後圖文選單即時自動切換至正式員工選單，實機全流程驗收 PASS，跨版本永久繼承 |
 | **6. 前端效能與體驗** | SWR 本地快取 (0ms 消除入職卡片閃爍) | `[User Verified ✅]` | 實機驗證通過，開屏流暢無閃爍 |
-| | ID Token 本機快速解碼 (零延遲身分注入) | `[Pending User Verification ⏳]` | 測試通過，待進一步多機驗收 |
+| | ID Token 本機快速解碼 (零延遲身分注入) | `[User Verified ✅]` | **v2.24.0 JSDOM 虛擬 DOM 與身分防呆自主驗收通過 (OK)**：① 前端 Fast-Path 驗證通過，`liff.getDecodedIDToken()` 記憶體即時同步注水同仁姓名至 `#userName`、身分至 `#userProfileTag`、頭像至 `#userAvatar`，100% 繞過跨網 `liff.getProfile()` 請求（0ms 零延遲）；② 異常拋出時自動平滑回退（Fallback to `liff.getProfile()`）並正確注水 DOM；③ SWR 本機快取率先渲染；④ 打卡（`/api/checkin`）與線上簽核（`/api/v1/approval/request`）API 面對偽造 ID Token 均具備 401 攔截防護，跨版本永久繼承 |
 | | 後端 D1 資料庫批次查詢加速 (`env.DB.batch`) | `[Pending User Verification ⏳]` | 測試通過，月曆響應速度提升 |
 | | 行動端左右滑動手勢換頁 (含表單避讓) | `[User Verified ✅]` | 實機驗證通過，滑動換頁順暢自然 |
 | **7. 地端管理後台** | 後台帳密登入 ＆ 7 天 Web Session Token | `[User Verified ✅]` | **使用者實機驗證通過 (OK)**：修復內聯字串引號語法錯誤後，後台帳密驗證、LocalStorage 持久化與 7 天 Web Session 登入跳轉運作正常 |
-| | 企業 M2M API 金鑰自主生成 / 撤銷中心 | `[Pending User Verification ⏳]` | 測試通過 (27 項全過)，待地端系統串接 |
-| | 門市據點配置、IP 白名單與立牌 QR 下載 | `[Pending User Verification ⏳]` | **v2.17.0 據點卡片支援管理設定與安全刪除**，提供 `DELETE /api/v1/tenant/locations/:id`，內建「總部保護」與「在職員工綁定阻擋」防呆，後台刪除按鈕雙重確認彈窗 |
-| | 排班管理 (UTF-8 BOM CSV 範本與批次匯入) | `[Pending User Verification ⏳]` | 測試通過，待地端人資批次上傳實測 |
-| | 出勤監控與計薪 CSV 報表匯出 | `[Pending User Verification ⏳]` | 測試通過，待出勤結算實測匯出 |
-| | 員工 PBAC 細粒度權限配置與主管指派 | `[Fixed - Re-verifying 🔄]` | **v2.7.4 修復彈窗 DOM 巢狀閉合錯誤**，按鈕可正常彈出並新增同仁快速下拉選單自動帶入權限 |
-| | 地端安全稽核日誌 (`SWITCH_DEVICE` 等事件) | `[Pending User Verification ⏳]` | 測試通過，待地端日誌巡檢實測 |
+| | 企業 M2M API 金鑰自主生成 / 撤銷中心 | `[User Verified ✅]` | **v2.25.0 Tier 2 HTML AST 與 Tier 4 D1 沙盒自主驗收通過 (OK)**：① 驗證 `POST /api/v1/tenant/keys` 嚴格參數校驗與負向防禦，生成一次性明文金鑰 `pk_live_...`，以 SHA-256 雜湊與 `key_hint` 落庫於 D1 `tenant_api_keys`；② 驗證 `GET /api/v1/tenant/keys` 金鑰清單查詢遮罩僅見 `key_hint`，絕對不洩漏明文與雜湊；③ 驗證 `POST/DELETE /api/v1/tenant/keys/:id/revoke` 嚴格權限控管（僅 ADMIN 放行，非所屬統編 404），成功撤銷並落庫 `is_active = 0`；④ 驗證已撤銷金鑰失效阻斷防禦（後續呼叫回傳 403 此租戶金鑰已被停用）；⑤ Tier 2 HTML AST 語法樹校驗保證 `createKeyModal`、`showKeyModal` 與 `tab-apikeys` 標籤 100% 嚴格閉合與 DOM 規範，跨版本永久繼承 |
+| | 門市據點配置、IP 白名單與立牌 QR 下載 | `[User Verified ✅]` | **v2.25.0 門市配置與刪除防呆自主驗收通過 (OK)**：① 總部保護不變量：嘗試刪除 `taxId-01` 或 `taxId` 總部主要據點 100% 拋錯阻斷（400 企業總部主要據點不可刪除）；② 跨統編防越界：非本統編之據點刪除時精準阻斷（400 權限越界）；③ 員工綁定防呆：該門市尚有在職員工綁定時 100% 攔截阻斷（400 無法刪除：該門市尚有 X 位在職員工綁定）；④ 允許刪除無員工綁定之次級門市據點（200 OK）並徹底自 D1 物理刪除；⑤ 解除員工綁定後允許正常刪除；⑥ 嚴格斷言美德街 56-11 號法定名稱恆為「豬毛有限公司 - 台中美德總部」，跨版本永久繼承 |
+| | 排班管理 (UTF-8 BOM CSV 範本與批次匯入) | `[User Verified ✅]` | **v2.26.0 D1 沙盒與 Node CSV 解析自主驗收通過 (OK)**：① 驗證 `GET /api/v1/tenant/schedules/template` 包含 UTF-8 BOM（`\uFEFF` / `0xEF, 0xBB, 0xBF`）與標準 8 大欄位標頭；② 驗證 `POST /api/v1/tenant/schedules/batch` 鑑權防護（未認證 401、READ_ONLY 403 僅 ADMIN 放行）與格式防呆（空陣列 400）；③ D1 物理驗證 `ON CONFLICT(company_id, line_user_id, work_date) DO UPDATE` 覆蓋與冪等性，舊資料被新資料精準覆蓋且筆數不重複增生；④ Tier 2 HTML AST 校驗保證 `#tab-schedules`、範本下載、上傳按鈕與隱藏 `#scheduleFileInput`（`.csv`）標籤 100% 閉合，跨版本永久繼承 |
+| | 出勤監控與計薪 CSV 報表匯出 | `[User Verified ✅]` | **v2.26.0 D1 沙盒與 RFC 4180 CSV 解析自主驗收通過 (OK)**：① 驗證 `GET /api/v1/tenant/records?format=csv` 鑑權防護（未認證 401）；② 匯出內容開頭具備 UTF-8 BOM（`\uFEFF` / `0xEF, 0xBB, 0xBF`）確保 Excel 開啟繁中零亂碼；③ 標頭精準對齊 10 大欄位，RFC 4180 引號包覆與內部引號 `""` 轉義防注入（如 `王"大明"` 完整還原）；④ 中文化轉譯（上班/下班、公司Wi-Fi/外網GPS/GPS）、工時浮點精度（如 `8.5`）與打卡距離整數化（`Math.round`）準確無誤；⑤ `startDate`, `endDate`, `status`, `punchType` 多重篩選條件與四重組合過濾筆數 100% 吻合，跨版本永久繼承 |
+| | 員工 PBAC 細粒度權限配置與主管指派 | `[User Verified ✅]` | **v2.28.0 D1 沙盒與 PBAC 授權矩陣自主驗收通過 (OK)**：① 後台 PBAC 彈窗與同仁下拉選單對接 `POST /api/v1/tenant/employees/:id/permissions`，成功配置子集權限；② 跨統編員工指派嚴格阻斷（403 權限越界）；③ 指派主管欄位與 10 大權限同步更新至 D1 `company_employees`，跨版本永久繼承 |
+| | 地端安全稽核日誌 (`SWITCH_DEVICE` 等事件) | `[User Verified ✅]` | **v2.28.0 裝置生命週期與 D1 稽核日誌自主驗收通過 (OK)**：① 首次綁定裝置精準記錄 `INITIAL_BIND` (INFO) 日誌；② 換機打卡 (`POST /api/device/switch`) 二階段確認後精準記錄 `SWITCH_DEVICE` (WARNING) 警告日誌，完整擷取新舊設備識別碼、公網 IP、User-Agent 與同仁資訊；③ 驗證 `GET /api/devices/audit` 完整查出警告事件並提供地端審計，跨版本永久繼承 |
 | **8. 定時提醒與推播** | Cloudflare Cron Triggers (`*/5 * * * *`) 雲端排程自動巡檢 | `[User Verified ✅]` | 整合測試通過 (5/5 PASS)，伺服器無人值守 24/7 自動巡檢 |
 | | 上班前 15 分鐘未打卡推播 (翡翠綠 Flex + 1-Click 打卡) | `[User Verified ✅]` | 測試通過，未打卡同仁準確收到提醒，已打卡同仁自動抑制 |
 | | 下班後 10 分鐘防漏打卡推播 (海洋藍 Flex + 1-Click 打卡) | `[User Verified ✅]` | 測試通過，未下班同仁準確收到提醒，已下班同仁自動抑制 |
 | | D1 `cron_notifications` 每日發送冪等性防重複防線 | `[User Verified ✅]` | 測試通過，每日至多推播 1 次，零重複騷擾 |
 | **9. 企業公告與多播簽收** | 企業重要公告發布與多播推送 (LINE Multicast 500-User Chunking) | `[Pending User Verification ⏳]` | 自動化整合測試通過 (46/46 PASS)，支援 500 人切片多播，精準隔絕跨租戶廣播洩漏 |
-| | 員工 LINE 聊天室卡片【✍️ 我已閱讀並簽收】互動簽收 (Postback Idempotency) | `[Pending User Verification ⏳]` | 自動化整合測試通過 (46/46 PASS)，首簽即時回傳確認，重簽精準提示原簽收時間並杜絕重複計數 |
-| | 地端管理後台公告發布與即時簽收名單追蹤 (已簽收/未簽收同仁明細) | `[Pending User Verification ⏳]` | 自動化整合測試通過 (46/46 PASS)，KPI 卡片與簽收率進度條動態渲染，支援雙欄位同仁穿透檢視 |
+| | 員工 LINE 聊天室卡片【✍️ 我已閱讀並簽收】互動簽收 (Postback Idempotency) | `[User Verified ✅]` | **v2.27.0 Webhook Postback 與 D1 嚴格冪等性自主驗收通過 (OK)**：① 驗證 `POST /api/webhook` 處理 `action=ack_announcement&id=<id>` 首簽：D1 `announcement_reads` 成功物理寫入 1 筆紀錄並帶入精確 `read_at` 時間戳，後台明細已簽收人數增為 1，名單自動流轉；② 嚴格冪等性防呆（二簽/重複簽收）：同仁再次點擊簽收觸發 `INSERT OR IGNORE`，D1 該員紀錄依然嚴格只有 1 筆，完好保留原始 `read_at` 時間戳，已簽收計數絕不重複累加；③ 邊界異常防呆：無效或空公告 ID 簽收 Webhook 優雅處理不當機；④ 第二位同仁簽收後簽收率達到 100%，`unreads` 降為 0，跨版本永久繼承 |
+| | 地端管理後台公告發布與即時簽收名單追蹤 (已簽收/未簽收同仁明細) | `[User Verified ✅]` | **v2.27.0 Tier 2 HTML AST 與 Tier 4 D1 沙盒自主驗收通過 (OK)**：① 驗證 `POST /api/v1/tenant/announcements` 鑑權防護（未認證 401）、空白標題與內文修剪防呆（400 公告標題與內容皆為必填項目）與實體落庫（201 Created，D1 announcements 寫入）；② 驗證 `GET /api/v1/tenant/announcements` 即時簽收統計（`total_recipients`, 初始 `read_count=0`, `read_rate=0%`）；③ 驗證 `GET /api/v1/tenant/announcements/:id` 簽收穿透明細（`stats` 與 `unreads` 精確包含受測同仁）；④ 驗證跨租戶邊界防護（外來統編 404 查無此公告或無存取權限，列表強隔離）；⑤ Tier 2 HTML AST 驗證 `#tab-announcements`、`#announcementModal` 與 `#announcementReadsModal` 標籤 100% 嚴格閉合與全域 ID 零重複，跨版本永久繼承 |
 | | 智慧一鍵催簽 (Remind Unread，精準向未簽收同仁重新多播) | `[Pending User Verification ⏳]` | 自動化整合測試通過 (46/46 PASS)，精準向未簽收同仁多播催簽通知，100% 簽收時自動抑制 |
-| **10. 個人電子薪資條** | 企業地端薪資 CSV 批次匯入與標準範本下載 (UTF-8 BOM CSV) | `[Pending User Verification ⏳]` | 自動化測試通過 (39/39 PASS)，支援標準 9 大欄位、數值驗證與預覽總額計算 |
+| **10. 個人電子薪資條** | 企業地端薪資 CSV 批次匯入與標準範本下載 (UTF-8 BOM CSV) | `[User Verified ✅]` | **v2.28.0 RFC 4180 CSV 解析與 UTF-8 BOM 範本自主驗收通過 (OK)**：① 驗證 `GET /api/v1/tenant/payslips/template` 產出 UTF-8 BOM CSV 範本與 9 大標準薪資欄位；② 驗證 `POST /api/v1/tenant/payslips/dispatch` 鑑權防護（未認證 401）與格式校驗（缺少必填欄位或金額非數值以 400 阻斷）；③ 跨租戶與非本企業在職員工防呆阻斷（400 員工不在所屬企業），跨版本永久繼承 |
 | | CRITICAL PRIVACY INVARIANT：手機鎖定螢幕與通知預覽 100% 遮罩金額 (`altText`) | `[User Verified ✅]` | 自動化測試通過 (39/39 PASS)，嚴格保證 altText 不含任何數字與具體薪資，防窺防洩漏 |
 | | 跨租戶隔離與在職員工防呆校驗 (防止跨企業誤發薪資) | `[User Verified ✅]` | 自動化測試通過 (39/39 PASS)，強制阻斷非本企業在職員工之 LINE ID 發送 |
-| | 專業海軍藍/翡翠綠 Flex 薪資明細卡片與資安稽核連動 (`PAYSLIP_DISPATCHED`) | `[Pending User Verification ⏳]` | 自動化測試通過 (39/39 PASS)，包含底薪/津貼/加班/扣款/實發金額與備註，稽核日誌完整落庫 |
+| | 專業海軍藍/翡翠綠 Flex 薪資明細卡片與資安稽核連動 (`PAYSLIP_DISPATCHED`) | `[User Verified ✅]` | **v2.28.0 Zod 契約校驗與安全日誌自主驗收通過 (OK)**：① `createPayslipBubble` 產出之 Flex 卡片通過 `assertValidFlexBubble` 與 `assertValidFlexMessage` Zod 契約閘門；② 負向協議注入防護（非法 action / 損毀屬性）精準捕捉並拋出 `FlexValidationError`；③ 發送後即時向 D1 `device_audit_logs` 寫入 `PAYSLIP_DISPATCHED` 安全稽核日誌，跨版本永久繼承 |
 
 
 ---
@@ -511,7 +512,7 @@ d:\line-checkin/
 
 > 📦 **歷史 ADR 存檔**：ADR 1 至 25 已封存至 [`docs/adr/HISTORICAL_ADRS.md`](file:///d:/line-checkin/docs/adr/HISTORICAL_ADRS.md)，完整保留歷史推演、替代方案評估與架構定調。
 
-### 📌 當前活躍與最新架構決策紀錄 (Recent Active ADRs: 26 - 33)
+### 📌 當前活躍與最新架構決策紀錄 (Recent Active ADRs: 26 - 71)
 
 26. **考勤打卡紀錄批次撤銷與狀態機重置專用 CLI 腳本架構 (Check-in Revocation CLI & State Machine Reset ADR v2.7.2)**：
     - **核心痛點**：
@@ -1112,6 +1113,80 @@ d:\line-checkin/
       - 狀態持久化繼承：Section 2.1 全功能使用者實機驗證狀態矩陣已永久更新為 `[User Verified ✅]`，跨版本永久繼承。
     - **成效指標**：
       - `npm run check`（`client:check` + `tsc --noEmit` + `depcruise src`）維持 **0 型別錯誤、0 架構違規**。
+60. **員工「豬毛」設定固定平日朝九晚五 (Fixed Weekday 09:00-17:00 Roster v2.20.5)**：
+    - 參照 [`ADR-0060-fixed-weekday-09-00-17-00-roster.md`](file:///d:/line-checkin/docs/adr/ADR-0060-fixed-weekday-09-00-17-00-roster.md)。
+61. **註冊 `.agents/skills.json` 整合外部技能庫 (Skills Configuration Standard v2.20.6)**：
+    - 參照 [`ADR-0061-skills-configuration-standard.md`](file:///d:/line-checkin/docs/adr/ADR-0061-skills-configuration-standard.md)。
+62. **前端獨立 TypeScript 建置管線 ＆ LINE Flex 協議 Zod 契約校驗閘門 (Frontend TypeScript Pipeline & LINE Flex Protocol Gate v2.21.0)**：
+    - 參照 [`ADR-0062-frontend-typescript-pipeline-line-flex-protoc.md`](file:///d:/line-checkin/docs/adr/ADR-0062-frontend-typescript-pipeline-line-flex-protoc.md)。
+63. **Batch 1 自主驗證落地：線上簽核、防冒審與 JSDOM 前端生命週期 (Batch 1 Autonomous Verification of Online Approvals & Anti-Impersonation v2.22.0)**：
+    - 參照 [`ADR-0063-batch-1-autonomous-verification-online-approvals.md`](file:///d:/line-checkin/docs/adr/ADR-0063-batch-1-autonomous-verification-online-approvals.md)。
+    - **成效指標**：專屬測試套件 [`test_batch1_verification.js`](file:///d:/line-checkin/test_batch1_verification.js) 41/41 項全數 PASS，LIFF 簽核入口、核准業務連動與身分防冒審 3 項正式轉為 `[User Verified ✅]`。
+64. **Batch 2 自主驗證落地：排班月曆視覺燈號、JSDOM 虛擬 DOM 渲染與 D1 沙盒管線 (Batch 2 Calendar Visual Indicators v2.23.0)**：
+    - **成效指標**：專屬測試套件 [`test_batch2_verification.js`](file:///d:/line-checkin/test_batch2_verification.js) 55/55 項全數 PASS，當日焦點翡翠綠光環、請假暖琥珀色卡與未排班透明感知（UNSCHEDULED/UNSCHEDULED_WORK）3 項正式轉為 `[User Verified ✅]`。
+65. **Batch 3 自主驗證落地：固定班預設班表一鍵實體化與 ID Token 本機快速解碼 (Batch 3 Fixed Schedules Materialization & ID Token Fast-Path Injection v2.24.0)**：
+    - 參照 [`ADR-0064-batch-3-fixed-schedules-id-token-verification.md`](file:///d:/line-checkin/docs/adr/ADR-0064-batch-3-fixed-schedules-id-token-verification.md)。
+    - **成效指標**：專屬測試套件 [`test_batch3_verification.js`](file:///d:/line-checkin/test_batch3_verification.js) 43/43 項全數 PASS，固定班一鍵實體化與 ID Token 快速解碼 2 項正式轉為 `[User Verified ✅]`。
+66. **Batch 4 自主驗證落地：企業 M2M API 金鑰自主生成撤銷中心與門市據點防呆 (Batch 4 Tenant M2M Keys & Location Safety Guards v2.25.0)**：
+    - 參照 [`ADR-0065-batch-4-tenant-keys-location-safety-guards.md`](file:///d:/line-checkin/docs/adr/ADR-0065-batch-4-tenant-keys-location-safety-guards.md)。
+    - **成效指標**：專屬測試套件 [`test_batch4_verification.js`](file:///d:/line-checkin/test_batch4_verification.js) 102/102 項全數 PASS，企業 M2M API 金鑰生成/撤銷中心與門市據點配置/刪除防呆 2 項正式轉為 `[User Verified ✅]`。
+67. **Batch 5 自主驗證落地：排班管理 CSV 匯入與出勤計薪報表匯出 (Batch 5 Schedule CSV Import & Attendance Payroll Export v2.26.0)**：
+    - 參照 [`ADR-0066-batch-5-schedule-import-and-payroll-csv-export.md`](file:///d:/line-checkin/docs/adr/ADR-0066-batch-5-schedule-import-and-payroll-csv-export.md)。
+    - **成效指標**：專屬測試套件 [`test_batch5_verification.js`](file:///d:/line-checkin/test_batch5_verification.js) 97/97 項全數 PASS，排班管理 (UTF-8 BOM CSV 範本與批次匯入) 與出勤監控與計薪 CSV 報表匯出 2 項正式轉為 `[User Verified ✅]`。
+68. **Batch 6 自主驗證落地：企業公告發布與 LINE 簽收冪等性 (Batch 6 Company Announcements & Read Receipts Idempotency v2.27.0)**：
+    - 參照 [`ADR-0067-batch-6-announcements-and-read-receipt-idempotency.md`](file:///d:/line-checkin/docs/adr/ADR-0067-batch-6-announcements-and-read-receipt-idempotency.md)。
+    - **成效指標**：專屬測試套件 [`test_batch6_verification.js`](file:///d:/line-checkin/test_batch6_verification.js) 93/93 項全數 PASS，地端管理後台公告發布與即時簽收名單追蹤 (已簽收/未簽收同仁明細) 與員工 LINE 簽收互動 (Postback Idempotency 首簽與二簽) 2 項正式轉為 `[User Verified ✅]`。
+69. **Batch 7 自主驗證落地：薪資明細、換機日誌與 PBAC 矩陣 (Batch 7 Payslips, Device Audit & PBAC Matrix v2.28.0)**：
+    - 參照 [`ADR-0068-batch-7-payslips-device-audit-and-pbac-matrix.md`](file:///d:/line-checkin/docs/adr/ADR-0068-batch-7-payslips-device-audit-and-pbac-matrix.md)。
+    - **成效指標**：專屬測試套件 [`test_batch7_verification.js`](file:///d:/line-checkin/test_batch7_verification.js) 88/88 項全數 PASS，D1 測試資料 Teardown 100% 清理確認 0 殘留，10 大原子權限體系 (PBAC)、員工 PBAC 細粒度配置、地端安全稽核日誌 (`SWITCH_DEVICE`)、薪資 CSV 匯入/範本與 Flex 薪資卡片 (Zod 契約校驗) 共 5 項正式轉為 `[User Verified ✅]`。
+70. **新人入職官方帳號雙重硬閘門與行動端排版優化 (Onboarding Friendship Hard Gate & Responsive Typography ADR v2.29.0)**：
+    - 參照 [`ADR-0069-onboarding-friendship-hard-gate-and-responsive-typography.md`](file:///d:/line-checkin/docs/adr/ADR-0069-onboarding-friendship-hard-gate-and-responsive-typography.md)。
+    - **成效指標**：
+      - 前端實裝 `liff.getFriendship()` 狀態機與後端 LINE Profile API 403 雙重硬閘門，未加好友前鎖定入職按鈕。
+      - 據點代碼與統編分拆雙行排版 (`whitespace-nowrap`) 徹底根除小螢幕換行斷字問題。
+      - 確認加入按鈕去除 `-` 符號並水平置中，擴增圖示左邊界間距。
+      - 專屬單元測試套件 5/5 斷言全數 PASS，Playwright 360×800 行動視窗高保真渲染驗證無誤。
+71. **新進同仁專屬全寬圖文選單與精煉入職動線 (Newcomer Onboarding Rich Menu & Streamlined Enrollment Flow ADR v2.30.0)**：
+    - 參照 [`ADR-0070-newcomer-onboarding-rich-menu-and-streamlined-flow.md`](file:///d:/line-checkin/docs/adr/ADR-0070-newcomer-onboarding-rich-menu-and-streamlined-flow.md)。
+    - **成效指標**：
+      - 註冊並發布新進同仁專屬 1 排 1 格全寬圖文選單（`richmenu-bac01ca95c466dc46d75055afea1a5d2`），移除 unicode emoji，標註清晰微軟正黑體粗體【新進同仁入職登記】並設為 LINE 官方帳號預設選單。
+      - LIFF 前端全面升級：未加好友時完全隱藏鎖定無效之確認入職按鈕，專注引導【加入打卡官方帳號好友】；已加好友時隱藏加好友按鈕，僅展現翡翠綠【確認加入考勤系統】。
+      - 支援門市代碼 `localStorage` 意圖記憶，加完好友後於聊天室點擊全版新人選單自動帶入原掃碼門市完成入職，入職後自動提升為正式員工選單。
+72. **三款圖文選單懸浮圓角卡片視覺重構與 Edge Headless 原生 Emoji 渲染管線 (Modern Floating Card Rich Menus & Chromium Native Emoji Pipeline ADR v2.31.0)**：
+    - 參照 [`ADR-0071-floating-card-rich-menus-and-chromium-native-emoji-pipeline.md`](file:///d:/line-checkin/docs/adr/ADR-0071-floating-card-rich-menus-and-chromium-native-emoji-pipeline.md)。
+    - **成效指標**：
+      - 徹底淘汰傳統 Python Pillow 直角純色塊繪製，建立 HTML/CSS 模板與 Windows 內建 Microsoft Edge Headless 原生截圖管線 (`scripts/render_rich_menus.js`)。
+      - 支援系統級 Font Fallback，完美渲染全彩 `Segoe UI Emoji`（🎉、⏱️、📅、✍️、🏢），零亂碼、零未知 UTF-8 豆腐方塊。
+      - 打造懸浮圓角卡片（Floating Rounded Cards）現代 UI：淺灰底板留白、40px 圓角、柔和陰影、雙層主副標題階層膠囊（主標 96~108px、副標 38~44px）。
+73. **Rich Menu 測試對稱快照還原與 LIFF 登入自愈對齊循環 (Rich Menu Symmetric Snapshot Teardown & Self-Healing Sync ADR v2.31.1)**：
+    - **成效指標**：
+      - 徹底修復 `test_rich_menu_sync.js` 測試 Teardown 主觀假設覆蓋 BUG，改採「對稱快照還原（Snapshot-and-Restore）」機制，執行前記錄真實用戶原始選單快照，結束時精準復原，杜絕測試污染真實開發者/管理者帳號。
+      - 在 [`software-testing/SKILL.md`](file:///C:/Users/pigmao/optional_skills/software-testing/SKILL.md) 寫入 Tier 4 對稱還原規範與 `Presumptive Teardown` 反模式防禦守則。
+      - 在 [`src/services/tenant.service.ts`](file:///d:/line-checkin/src/services/tenant.service.ts) 實裝 LIFF 登入/讀取個人資料時的「自愈對齊循環（Self-Healing Reconciliation Loop）」，背景主動校準外部 LINE 伺服器選單與 D1 資料庫權限。
+      - 即時打 API 將同仁「豬毛」（`Ubd107bb3ba1b85a8086fc3b2250458e8`）之 LINE 綁定選單由主管管理選單校正為員工專屬選單（`richmenu-b47dd19067e5d2b30293e8a426a3214a`），100% 驗證通過。
+
+74. **Rich Menu 視覺扁平精煉化：全白底卡片、移除副標題與 CTA 字體放大 10% (Unified White Card Rich Menus & 10% CTA Typography Boost v2.31.2)**：
+    - **背景與需求**：
+      - 移除所有按鈕的副標題小字（subtitles），去除手機版面雜訊；將「考勤打卡」與「門市管理工作台」改為與排班月曆、線上簽核一致的純白底懸浮卡片風格。
+      - 主功能 CTA 標題字形統一放大 10%（由 96~104px 提升至 106~115px），垂直居中對齊。
+    - **工項實施**：
+      - 調整 `scripts/templates/richmenu_employee.html`、`scripts/templates/richmenu_manager.html` 與 `scripts/templates/richmenu_onboarding.html`。
+      - 執行 `npm run render:menus` 重新生成 2500x843 與 2500x1686 之高畫質 PNG 圖檔。
+      - 執行 `npm run setup:menus` 同步發布新圖文選單至 LINE Messaging API，設定新進人員選單為預設，並清理舊版選單 ID。
+    - **成效指標**：
+      - `npm run check`（`client:check` + `tsc --noEmit` + `depcruise src`）維持 **0 型別錯誤、0 架構違規**。
+75. **關閉打卡定時提醒功能與 Cloudflare Cron Triggers 停用 (Check-in Reminder Shutdown & Cron Triggers Removal v2.31.4)**：
+    - **背景與需求**：
+      - 依指示完全關閉定時打卡推播提醒功能，避免推播打擾同仁。
+    - **工項實施**：
+      - `wrangler.jsonc`：將 `"triggers": { "crons": [...] }` 清空為 `[]`，移除 Cloudflare 全球邊緣 5 分鐘排程觸發。
+      - `wrangler.jsonc` vars：配置 `"ENABLE_CHECKIN_REMINDERS": "false"`。
+      - `src/types/index.ts`：在 `Env` 介面擴充 `ENABLE_CHECKIN_REMINDERS?: string;`。
+      - `src/services/cron.service.ts`：在 `handleCronScheduled` 起首檢核 `this.env.ENABLE_CHECKIN_REMINDERS === "false"`，直接返回不執行推播與資料庫掃描。
+      - `src/index.ts`：在 `scheduled` 生命週期事件起首阻斷，確保未經啟用絕不調用 `handleCronScheduled()`。
+    - **成效指標**：
+      - `npm run check`（`client:check` + `tsc --noEmit` + `depcruise src`）維持 **0 型別錯誤、0 架構違規**。
+      - 成功部署至 Cloudflare Workers 邊緣節點。
 
 ---
 

@@ -1,3 +1,0 @@
-display_name: LINE Cloud Manager
-short_description: Develop, debug, and manage LINE Messaging API (v3), LIFF (v2), Flex Messages, Webhooks, and Rich Menus.
-default_prompt: How do I build a LINE bot webhook and LIFF check-in app with token verification?

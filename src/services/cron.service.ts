@@ -53,6 +53,20 @@ export class CronService {
     let skippedCount = 0;
     const errors: string[] = [];
 
+    // Check if check-in reminders feature is disabled
+    if (this.env.ENABLE_CHECKIN_REMINDERS === "false") {
+      return {
+        success: true,
+        date: workDate,
+        currentTime: timeStr,
+        scannedCount: 0,
+        remindInSent: 0,
+        remindOutSent: 0,
+        skippedCount: 0,
+        errors: ["Check-in reminder feature is disabled (ENABLE_CHECKIN_REMINDERS=false)"],
+      };
+    }
+
     try {
       const schedules = await this.cronRepo.getActiveSchedulesForDate(workDate);
       const punches = await this.cronRepo.getTodayPunches(workDate);
