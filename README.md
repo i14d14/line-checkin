@@ -117,9 +117,3 @@ npm run test:batch1
 # 4. 執行完整自動化測試套件（239+ 測試）
 npm test
 ```
-
----
-
-## 🔒 資安與金鑰保護聲明 (Security & Zero-Leakage)
-- 本專案已徹底執行金鑰脫敏作業，程式庫與所有 Git Commit 歷史均通過 **Gitleaks 8.30.1** 深度掃描（0 Leaks Found）。
-- 所有敏感金鑰（LINE Channel Secret、Cloudflare API Token）均採用 Cloudflare Workers Secrets (`wrangler secret put`) 於雲端加密儲存，本機開發使用 [`.dev.vars`](file:///d:/line-checkin/.dev.vars) 並嚴格由 [`.gitignore`](file:///d:/line-checkin/.gitignore) 隔離。
