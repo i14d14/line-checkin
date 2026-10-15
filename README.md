@@ -6,8 +6,8 @@
 [![Tests Passing](https://img.shields.io/badge/Tests-239%2B%20Passing-brightgreen)](#)
 [![Zero Dependency Violations](https://img.shields.io/badge/Architecture-depcruise%200%20violations-blue)](#)
 
-> **專案定位與聲明**：  
-> 本專案為個人模仿 **人易科技 (NUEiPS)** 差勤打卡與企業管理解決方案之架構練習作品，作為求職面試之技術成果展示。
+> **Project Scope & Disclaimer**:  
+> An architectural practice project mimicking **NUEiPS (人易科技)** enterprise attendance and leave management solutions, developed as a technical portfolio showcase for interview review.
 
 ---
 
